@@ -252,7 +252,23 @@ experiments:
         - refgraph: "hprc-v2.0-minigraph-eval"
           mapper: ["minigraph", "graphaligner-default", "graphaligner-fast"]
 
-  hifi_sim_compare:
+  hifi_sim_compare_grch38:
+    control:
+      subset: 10k
+      tech: hifi
+      reference: grch38
+      sample: HG002
+      realness: sim
+    vary:
+      mapper: ["minimap2-map-hifi", "pbmm2", "giraffe-k31.w50.W-hifi-99930d-mmcs100", "giraffe-k31.w50.W-hifi-8a0e9e-noflags"]
+      refgraph: ["hprc-v2.0-mc-eval-d46", "hprc-v2.0-mc-eval.ec1M-sampled16o", "hprc-sep8-mc-eval-sampled16o"]
+    constrain:
+        - refgraph: "hprc-v2.0-mc-eval-d46"
+          mapper: ["minimap2-map-hifi", "pbmm2"]
+        - refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o", "hprc-sep8-mc-eval-sampled16o"]
+          mapper: ["giraffe-k31.w50.W-hifi-99930d-mmcs100", "giraffe-k31.w50.W-hifi-8a0e9e-noflags"]
+
+  hifi_sim_compare_chm13:
     control:
       subset: 10k
       tech: hifi
@@ -260,8 +276,13 @@ experiments:
       sample: HG002
       realness: sim
     vary:
-      mapper: ["pbmm2", "winnowmap", "giraffe-k31.w50.W-hifi-99930d-noflags", "giraffe-k31.w50.W-hifi-99930d-mmcs80", "giraffe-k31.w50.W-hifi-99930d-mmcs90", "giraffe-k31.w50.W-hifi-99930d-mmcs100", "giraffe-k31.w50.W-hifi-99930d-mmcs120", "giraffe-k31.w50.W-hifi-99930d-mmcs140", "giraffe-k31.w50.W-hifi-99930d-mmcs160", "giraffe-k31.w50.W-hifi-99930d-mmcs180", "giraffe-k31.w50.W-hifi-99930d-mmcs200"]
-      refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
+      mapper: ["minimap2-map-hifi", "pbmm2", "giraffe-k31.w50.W-hifi-99930d-mmcs100", "giraffe-k31.w50.W-hifi-8a0e9e-noflags"]
+      refgraph: ["hprc-v2.0-mc-eval-d46", "hprc-v2.0-mc-eval.ec1M-sampled16o"]
+    constrain:
+        - refgraph: "hprc-v2.0-mc-eval-d46"
+          mapper: ["minimap2-map-hifi", "pbmm2"]
+        - refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o", "hprc-sep8-mc-eval-sampled16o"]
+          mapper: ["giraffe-k31.w50.W-hifi-99930d-mmcs100", "giraffe-k31.w50.W-hifi-8a0e9e-noflags"]
     
   illumina_sim_1m:
     control:
@@ -550,21 +571,30 @@ experiments:
       reference: chm13
       sample: HG002
       realness: real
+      refgraph: "hprc-v2.0-mc-eval.ec1M-sampled16o"
+      callparams: ".model2025-03-26noinfo"
       # SV specific parameters with generic names
       caller: vgcall
       truthset: giab6
       truthref: chm13
     vary:
-      mapper: ["giraffe-k31.w50.W-hifi-99930d-mmcs100", "giraffe-k31.w50.W-hifi-99930d-mmcs100"]
-      refgraph: ["hprc-v2.0-mc-eval-d46", "hprc-v2.0-mc-eval-sampled16o", "hprc-v2.0-mc-eval.ec1M-sampled16o"]
-      callparams: [".newdv", ".nomodel.newdv"]
-    constrain:
-      - refgraph: "hprc-v2.0-mc-eval-sampled16o"
-        mapper: "pbmm2"
-        callparams: ".nomodel.newdv"
-      - mapper: ["giraffe-k31.w50.W-hifi-99930d-mmcs100", "giraffe-k31.w50.W-hifi-99930d-mmcs100"]
-        callparams: [".newdv", ".model2025-03-26noinfo.olddv"]
-        refgraph: "hprc-v2.0-mc-eval.ec1M-sampled16o"
+      mapper: ["giraffe-k31.w50.W-hifi-99930d-mmcs100", "giraffe-k31.w50.W-hifi-8a0e9e-noflags", "giraffe-k31.w50.W-hifi-d0bef8-noflags"]
+
+  hifi_real_dvdebug_grch38:
+    control:
+      subset: full
+      tech: hifi
+      reference: grch38
+      sample: HG002
+      realness: real
+      callparams: ".model2025-03-26noinfo"
+      # SV specific parameters with generic names
+      caller: vgcall
+      truthset: giab6
+      truthref: chm13
+    vary:
+      mapper: ["giraffe-k31.w50.W-hifi-8a0e9e-noflags", "giraffe-k31.w50.W-hifi-99930d-mmcs100"]
+      refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o", "hprc-sep8-mc-eval-sampled16o"]
 
   hifi_sim_scorescale_chm13:
     control:
@@ -638,14 +668,15 @@ experiments:
       reference: chm13
       sample: HG002
       realness: real
+      refgraph: "hprc-v2.0-mc-eval.ec1M-sampled16o"
+      callparams: ".nomodel"
       # SV specific parameters with generic names
       caller: vgcall
       truthset: giab6
       truthref: chm13
     vary:
-      mapper: ["giraffe-k31.w50.W-r10-99930d-noflags", "giraffe-k31.w50.W-r10-791547-noflags"]
-      refgraph: ["hprc-v2.0-mc-eval-sampled16o"]
-      callparams: [".nomodel.olddv"]
+      mapper: ["giraffe-k31.w50.W-r10-99930d-noflags", "giraffe-k31.w50.W-r10-8a0e9e-noflags", "giraffe-k31.w50.W-r10-d0bef8-noflags"]
+      
 
   r10y2025_real_100k:
     control:

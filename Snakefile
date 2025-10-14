@@ -154,6 +154,11 @@ READS_DIR = config.get("reads_dir", None) or "/private/groups/patenlab/anovak/pr
 # and .fa.fai without pansn names, and _PAR.bed files with the pseudo-autosomal
 # regions.
 #
+# We generate -Nonly.fa versions of the FASTA files, because vg can't represent
+# non-N ambiguity codes and will treat them as N, meaning the surjected
+# alignments can only really be interpreted against a linear reference that
+# only uses N.
+#
 # We also use, but can generate:
 #
 # Index files for Minimap2 for each preset (here "hifi", can also be "ont" or "sr", and can be generated from the FASTA):
@@ -211,6 +216,7 @@ REAL_SLURM_EXTRA = config.get("real_slurm_extra", None) or ""
 # If set to True, jobs where we care about speed will demand entire nodes.
 # If False, they will just use one thread per core.
 EXCLUSIVE_TIMING = config.get("exclusive_timing", True)
+assert isinstance(EXCLUSIVE_TIMING, bool), f"exclusive_timing must be a bool, not {repr(EXCLUSIVE_TIMING)}"
 
 # Jobs of this many real reads or more will be timed exclusively, if
 # EXCLUSIVE_TIMING is on.
@@ -223,6 +229,7 @@ MAPPER_THREADS = 64 if EXCLUSIVE_TIMING else 32
 # We may not want to populate the MiniWDL task cache because it makes us take
 # more shared disk space.
 FILL_WDL_CACHE = "true" if config.get("fill_wdl_cache", True) else "false"
+assert isinstance(config.get("fill_wdl_cache", True), bool), f"fill_wdl_cache must be a bool, not {repr(config.get('fill_wdl_cache', True))}"
 
 # Figure out what columns to put in a table comparing all the conditions in an experiment.
 # TODO: Make this be per-experiment and let multiple tables be defined
@@ -237,6 +244,8 @@ VG_FRAGMENT_HAPLOTYPE_INDEXING_VERSION="v1.64.1"
 VG_HAPLOTYPE_SAMPLING_VERSION="v1.64.1"
 # What version of vg should be used to haplotype-sample graphs when we want to keep just one reference?
 VG_HAPLOTYPE_SAMPLING_ONEREF_VERSION="v1.64.1"
+# What version of vg should be used to surject reads?
+VG_SURJECT_VERSION="99930d"
 
 wildcard_constraints:
     expname="[^/]+",
@@ -500,6 +509,8 @@ def reference_basename(wildcards):
     elif wildcards["reference"] == "chm13v1":
         # Use this for the older version, so just chm13 without the v1 and without the newY
         parts[0] = "chm13"
+    # We can't take non-N ambiguity codes in the reference.
+    parts.append("Nonly")
     return os.path.join(REFS_DIR, "-".join(parts))
 
 def reference_fasta(wildcards):
@@ -568,14 +579,18 @@ def calling_reference_fasta(wildcards):
 
     For CHM13, we always use CHM13v2.0 as the calling reference since that's
     the one we can get a truth on.
+
+    We always use references with N as the only ambiguity code. (For CHM13,
+    this should end up being the same thing, since CHM13 doesn't use other
+    codes.)
     """
     match wildcards["reference"]:
         case "chm13":
-            return os.path.join(REFS_DIR, "chm13v2.0.fa")
+            return os.path.join(REFS_DIR, "chm13v2.0-Nonly.fa")
         case "chm13v1":
-            return os.path.join(REFS_DIR, "chm13v2.0.fa")
+            return os.path.join(REFS_DIR, "chm13v2.0-Nonly.fa")
         case reference:
-            return os.path.join(REFS_DIR, reference + ".fa")
+            return os.path.join(REFS_DIR, reference + "-Nonly.fa")
 
 def calling_reference_fasta_index(wildcards):
     """
@@ -777,7 +792,7 @@ def surjectable_gam(wildcards):
 
     return "{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam".format(**format_data)
 
-def graph_base(wildcards, force_all_refs=False):
+def graph_base(wildcards, force_all_refs=False, skip_sampling=False):
     """
     Find the base name for a collection of graph files from reference and either refgraph or all of refgraphbase, modifications, and clipping.
 
@@ -788,6 +803,9 @@ def graph_base(wildcards, force_all_refs=False):
     If force_all_refs is set, will drop 'o' from the sampling flags, if present,
     to get the version of the graph that has all the references present in the
     base graph.
+
+    If skip_sampling is set, will get the graph that would be sampled from
+    instead of the sampled graph.
     """
 
     # For membership testing, we need a set of wildcard keys
@@ -851,7 +869,8 @@ def graph_base(wildcards, force_all_refs=False):
                 # references instead.
                 last = last[:-1]
 
-            modifications.append(f"-{last}_fragmentlinked-for-real-{wildcards['tech']}-{wildcards['sample']}{sampling_trimmedness}-full")
+            if not skip_sampling:
+                modifications.append(f"-{last}_fragmentlinked-for-real-{wildcards['tech']}-{wildcards['sample']}{sampling_trimmedness}-full")
             parts.pop()
         elif re.fullmatch("d[0-9]+", last):
             # We have a clipping modifier, which gets a dot.
@@ -892,11 +911,23 @@ def all_refs_gbz(wildcards):
     """
     return graph_base(wildcards, force_all_refs=True) + ".gbz"
 
+def unsampled_gbz(wildcards):
+    """
+    Find a graph GBZ file with no haplotype sampling.
+    """
+    return graph_base(wildcards, skip_sampling=True) + ".gbz"
+
 def hg(wildcards):
     """
     Find a graph hg file from reference.
     """
     return graph_base(wildcards) + ".hg"
+
+def all_refs_hg(wildcards):
+    """
+    Find a graph hg file with all linear references from reference.
+    """
+    return graph_base(wildcards, force_all_refs=True) + ".hg"
 
 def gfa(wildcards):
     """
@@ -2042,6 +2073,35 @@ rule merge_graphaligner_gams:
 # Prefer to chunk gams for graphaligner, but only works for real reads on the full hprc graph
 ruleorder: merge_graphaligner_gams > graphaligner_real_reads
 
+rule remove_reference_ambiguity_codes:
+    input:
+        fasta=REFS_DIR + "/{basename}.fa"
+    output:
+        fasta=REFS_DIR + "/{basename}-Nonly.fa",
+        fasta_index=REFS_DIR + "/{basename}-Nonly.fa.fai"
+    threads: 1
+    resources:
+        mem_mb=8000,
+        runtime=30,
+        slurm_partition=choose_partition(30)
+    shell:
+        # Replace all non-N ambiguity codes on non-header lines with N. See:
+        # Chua, Eng Guan. (2017). Re: How to remove ambiguous DNA characters form mulit-sequence FASTA file?. Retrieved from: https://www.researchgate.net/post/How_to_remove_ambiguous_DNA_characters_form_mulit-sequence_FASTA_file/5a3c7390cd0201daa15ec4a3/citation/download.
+        "sed '/^[^>]/s/[R|Y|W|S|M|K|H|B|V|D]/N/g' {input.fasta} >{output.fasta} && samtools faidx {output.fasta}"
+
+rule copy_par_bed:
+    input:
+        bed=REFS_DIR + "/{basename}_PAR.bed"
+    output:
+        bed=REFS_DIR + "/{basename}-Nonly_PAR.bed",
+    threads: 1
+    resources:
+        mem_mb=2000,
+        runtime=10,
+        slurm_partition=choose_partition(10)
+    shell:
+       "cp {input.bed} {output.bed}"
+
 rule dict_index_reference:
     input:
         reference_fasta=REFS_DIR + "/{basename}.fa"
@@ -2166,8 +2226,8 @@ rule giraffe_sim_reads:
         unpack(indexed_graph),
         gam=os.path.join(READS_DIR, "sim/{tech}/{sample}/{sample}-sim-{tech}-{subset}.gam"),
     output:
-        gam="{root}/annotated-1/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
-    log:"{root}/annotated-1/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.log"
+        gam="{root}/aligned/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
+    log:"{root}/aligned/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.log"
     wildcard_constraints:
         realness="sim"
     threads: auto_mapping_threads
@@ -2686,7 +2746,11 @@ ruleorder: inject_bam_add_pairing > inject_bam
 
 rule surject_gam:
     input:
-        gbz=gbz,
+        # We surject onto the un-sampled graph because the sampled graph (as of
+        # vg 99930d) drops any contigs that don't have any snarls on them, and
+        # then surject complains about the graph not matching the reference
+        # info from the dict.
+        gbz=unsampled_gbz,
         # We surject onto all target reference paths, even those we can't call
         # on, like Y in CHM13 (due to different Ys being used in different
         # graphs), and the _random contigs in GRCh38. Otherwise mappers mapping
@@ -2702,14 +2766,15 @@ rule surject_gam:
         mapper="(giraffe.*|graphaligner-.*)"
     params:
         # The default preset is paired
-        paired_flag=lambda w: "-i" if re.match("giraffe-[^-]*-default-[^-]*-[^-]*", w["mapper"]) else ""
+        paired_flag=lambda w: "-i" if re.match("giraffe-[^-]*-default-[^-]*-[^-]*", w["mapper"]) else "",
+        vg_binary=get_vg_version(VG_SURJECT_VERSION)
     threads: 40
     resources:
         mem_mb=lambda w: (600000 / 64 * 40) if w["tech"] in ("r10", "r10y2025") else (150000 / 64 * 40),
         runtime=600,
         slurm_partition=choose_partition(600)
     shell:
-        "vg surject -F {input.reference_dict} -x {input.gbz} -t {threads} --bam-output --sample {wildcards.sample} --read-group \"ID:1 LB:lib1 SM:{wildcards.sample} PL:{wildcards.tech} PU:unit1\" --prune-low-cplx {params.paired_flag} {input.gam} > {output.bam}"
+        "{params.vg_binary} surject -F {input.reference_dict} -x {input.gbz} -t {threads} --bam-output --sample {wildcards.sample} --read-group \"ID:1 LB:lib1 SM:{wildcards.sample} PL:{wildcards.tech} PU:unit1\" --prune-low-cplx {params.paired_flag} {input.gam} > {output.bam}"
 
 rule sort_gam:
     input:
@@ -2859,7 +2924,7 @@ rule call_variants_dv:
             "DeepVariant.OUTPUT_CALLING_BAMS": False,
             "DeepVariant.CALL_CORES": 8 * 4,
             "DeepVariant.CALL_MEM": 50 * 4,
-            "DeepVariant.MAKE_EXAMPLES_MEM": 50
+            "DeepVariant.MAKE_EXAMPLES_MEM": 100 if wildcards.reference == "grch38" else 50
         }
         if dv_docker == "gcr.io/deepvariant-docker/deepvariant:head756846963":
             # We can't use a model example_info file, so we still need to set some flags.
@@ -3051,7 +3116,7 @@ rule compare_alignments_not_category:
 
 rule annotate_alignments:
     input:
-        gbz=gbz,
+        gbz=all_refs_gbz,
         gam="{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
     output:
         gam="{root}/annotated-1/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
@@ -3062,11 +3127,12 @@ rule annotate_alignments:
         slurm_partition=choose_partition(600)
     shell:
         "vg annotate -t16 -a {input.gam} -x {input.gbz} -m --search-limit=-1 >{output.gam}"
-ruleorder: giraffe_sim_reads > annotate_alignments
+ruleorder: annotate_preannotated_alignments_right_ref > annotate_alignments
+ruleorder: annotate_preannotated_alignments_right_sampling > annotate_alignments
 
 rule annotate_alignments_against_hg:
     input:
-        hg=hg,
+        hg=all_refs_hg,
         gam="{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
     output:
         gam="{root}/annotated-1/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
@@ -3078,15 +3144,41 @@ rule annotate_alignments_against_hg:
     shell:
         "vg annotate -t16 -a {input.gam} -x {input.hg} -m --search-limit=-1 >{output.gam}"
 ruleorder: annotate_alignments > annotate_alignments_against_hg
-ruleorder: giraffe_sim_reads > annotate_alignments_against_hg
+ruleorder: annotate_preannotated_alignments_right_ref > annotate_alignments_against_hg
+ruleorder: annotate_preannotated_alignments_right_sampling > annotate_alignments_against_hg
 
-rule de_annotate_sim_alignments:
+# For Giraffe on sim reads, we annotate the alignments against the mapping
+# target graph when we make them. Since the truth positions in the simulated
+# reads are all on CHM13, if the target graph contained CHM13 (i.e. wasn't a
+# one-ref-sampled GRCh38-based graph), we can use those annotations instead.
+
+# So we cover all the graphs that are CHM13-based and not GRCh38-based
+rule annotate_preannotated_alignments_right_ref:
     input:
-        gam="{root}/annotated-1/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
-    output:
         gam="{root}/aligned/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
+    output:
+        gam="{root}/annotated-1/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
     wildcard_constraints:
-        realness="sim"
+        realness="sim",
+        reference="chm13|chm13v1"
+    threads: 1
+    resources:
+        mem_mb=2000,
+        runtime=5,
+        slurm_partition=choose_partition(5)
+    shell:
+        "ln {input.gam} {output.gam}"
+ruleorder: annotate_preannotated_alignments_right_sampling > annotate_preannotated_alignments_right_ref
+
+# And we also cover all the graphs that aren't one-ref-sampled
+rule annotate_preannotated_alignments_right_sampling:
+    input:
+        gam="{root}/aligned/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
+    output:
+        gam="{root}/annotated-1/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
+    wildcard_constraints:
+        realness="sim",
+        refgraph="(?!model)(?!legacy)(?!olddv)(?!newdv)((?!sampled[0-9a-z]+o)[^/_-]+?)(-(?!sampled[0-9a-z]+o)[^/_-]+?)*"
     threads: 1
     resources:
         mem_mb=2000,
@@ -4990,7 +5082,7 @@ rule mapq_by_correctness:
 rule softclips_by_name_gam:
     input:
         gam="{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam",
-        length_by_name="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.length_by_name.tsv",
+        length_by_name=os.path.join(READS_DIR, "{realness}/{tech}/stats/{sample}{trimmedness}.{subset}.read_length_by_name.tsv"),
     output:
         mapped_tsv=temp("{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.mapped_softclips_by_name.tsv"),
         sorted_tsv=temp("{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.sorted_mapped_softclips_by_name.tsv"),
