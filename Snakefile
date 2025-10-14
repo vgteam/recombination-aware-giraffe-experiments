@@ -11,7 +11,7 @@ import numpy as np
 
 # Set a default config file. This can be overridden with --configfile.
 # See the config file for how to define experiments.
-configfile: "lr-config.yaml"
+configfile: "ra-config.yaml"
 
 # Where are the input graphs?
 #
@@ -180,7 +180,7 @@ TRUTH_DIR = config.get("truth_dir", None) or "/private/groups/patenlab/anovak/pr
 MODELS_DIR = config.get("models_dir", None) or "/private/groups/patenlab/anovak/projects/hprc/lr-giraffe/models/"
 
 # When we "snakemake all_paper_figures", where should the results go?
-ALL_OUT_DIR = config.get("all_out_dir", None) or "/private/groups/patenlab/project-lrg"
+ALL_OUT_DIR = config.get("all_out_dir", None) or "/private/groups/patenlab/project-rag"
 
 # What stages does the Giraffe mapper report times for?
 STAGES = ["minimizer", "seed", "tree", "fragment", "chain", "align", "winner"]
@@ -1486,30 +1486,8 @@ def has_stat_filter(stat_name):
 
 def get_vg_flags(wildcard_flag):
     match wildcard_flag:
-        case "gapExt":
-            return "--do-gapless-extension"
-        case "mqCap":
-            return "--explored-cap"
-        case downsample_number if downsample_number[0:10] == "downsample":
-            return "--downsample-min " + downsample_number[10:]
-        case "mapqscale":
-            return "--mapq-score-scale 0.01"
-        case scorescale_number if scorescale_number[0:10] == "scorescale":
-            return "--mapq-score-scale " + scorescale_number[10:]
-        case "moreseeds":
-            return "--downsample-window-length 400"
-        case "mqWindow":
-            return "--mapq-score-scale 1 --mapq-score-window 150"
-        case mcspb_number if mcspb_number[0:5] == "mcspb":
-            return "--min-chain-score-per-base " + mcspb_number[5:]
-        case mcspem_number if mcspem_number[0:6] == "mcspem":
-            return "--min-chain-score-per-base 0.0 --min-chain-score-per-explored-minimizer " + mcspem_number[6:]
-        case sp_number if sp_number[0:2] == "sp":
-            return "--softclip-penalty " + sp_number[2:]
-        case mmcs_number if mmcs_number[0:4] == "mmcs":
-            return "--max-min-chain-score " + mmcs_number[4:]
-        case "candidate1":
-            return "--max-min-chain-score 60 --chain-score-threshold 150"
+        case "recmode":
+            return "--rec-mode"
         case "noflags":
             return ""
         case unknown:
