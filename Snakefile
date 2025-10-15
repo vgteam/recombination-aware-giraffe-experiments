@@ -1487,7 +1487,7 @@ def has_stat_filter(stat_name):
 def get_vg_flags(wildcard_flag):
     match wildcard_flag:
         case "recpenalty":
-            return "--rec-mode --rec-penalty-chain 4 --rec-penality-fragment 2"
+            return "--rec-mode --rec-penalty-chain 4 --rec-penalty-fragment 2"
         case "noflags":
             return ""
         case unknown:
