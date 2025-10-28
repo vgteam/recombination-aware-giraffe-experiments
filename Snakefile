@@ -1328,7 +1328,7 @@ def wildcards_to_condition(all_wildcards):
             condition[var] = all_wildcards[var]
         elif var == "mapper":
             #If we haven't defined a mapper, but we have the components of a giraffe mapper
-            minimizer_params = all_wildcards.get("minparams", "k"+all_wildcards["k"]+".w"+all_wildcards["w"]+all_wildcards["weightedness"])
+            minimizer_params = all_wildcards.get("minparams", "k"+all_wildcards["k"]+".w"+all_wildcards["w"]+all_wildcards["weightedness"]+all_wildcards["pathness"])
             condition[var] = "giraffe-" + minimizer_params + "-" + all_wildcards["preset"] + "-" + all_wildcards["vgversion"] + "-" + all_wildcards["vgflag"]
         elif var == "refgraph" and len(all_wildcards.get("refgraphbase", "")) != 0:
             #If we haven't defined refgraph, but we have the components
@@ -1779,22 +1779,24 @@ rule minimizer_index_graph:
     input:
         unpack(dist_indexed_graph)
     output:
-        minfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.withzip.min",
-        zipfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.zipcodes"
-    benchmark: "{graphs_dir}/indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.benchmark"
+        minfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}{pathness}.withzip.min",
+        zipfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}{pathness}.zipcodes"
+    benchmark: "{graphs_dir}/indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}{pathness}.benchmark"
     wildcard_constraints:
         weightedness="\\.W|",
+        pathness="\\.path|",
         k="[0-9]+",
         w="[0-9]+"
     params:
-        weighting_option=lambda w: "--weighted" if w["weightedness"] == ".W" else ""
+        weighting_option=lambda w: "--weighted" if w["weightedness"] == ".W" else "",
+        path_option=lambda w: "--rec-mode" if w["pathness"] == ".path" else "",
     threads: 16
     resources:
         mem_mb=lambda w: 600000 if ("hprc-v2" in w["refgraphbase"]  or "hprc-v1.1-nov.11.2024" in w["refgraphbase"]) else 320000 if w["weightedness"] == ".W" else 80000,
         runtime=240,
         slurm_partition=choose_partition(240)
     shell:
-        "vg minimizer --progress -k {wildcards.k} -w {wildcards.w} {params.weighting_option} -t {threads} -p -d {input.dist} -z {output.zipfile} -o {output.minfile} {input.gbz}"
+        "vg minimizer --progress -k {wildcards.k} -w {wildcards.w} {params.weighting_option} {params.path_option} -t {threads} -p -d {input.dist} -z {output.zipfile} -o {output.minfile} {input.gbz}"
 
 rule non_zipcode_minimizer_index_graph:
     input:
@@ -3624,14 +3626,15 @@ rule haplotype_sampling_time_giraffe:
         kmer_counting=kmer_counts_benchmark,
         haplotype_sampling=os.path.join(GRAPHS_DIR, "indexing_benchmarks/haplotype_sampling_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}_fragmentlinked-for-{realness}-{tech}-{sample}{trimmedness}-{subset}.benchmark"),
         distance_indexing=os.path.join(GRAPHS_DIR, "indexing_benchmarks/distance_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}_fragmentlinked-for-{realness}-{tech}-{sample}{trimmedness}-{subset}.benchmark"),
-        minimizer_indexing=os.path.join(GRAPHS_DIR, "indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}_fragmentlinked-for-{realness}-{tech}-{sample}{trimmedness}-{subset}.k{k}.w{w}{weightedness}.benchmark")
+        minimizer_indexing=os.path.join(GRAPHS_DIR, "indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}_fragmentlinked-for-{realness}-{tech}-{sample}{trimmedness}-{subset}.k{k}.w{w}{weightedness}{pathness}.benchmark")
     params:
         condition_name=condition_name
     output:
-        tsv="{root}/experiments/{expname}/{reference}/{refgraphbase}{modifications}{clipping}{full}{chopping}{sampling}/giraffe-k{k}.w{w}{weightedness}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.haplotype_sampling_time.tsv"
+        tsv="{root}/experiments/{expname}/{reference}/{refgraphbase}{modifications}{clipping}{full}{chopping}{sampling}/giraffe-k{k}.w{w}{weightedness}{pathness}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.haplotype_sampling_time.tsv"
     wildcard_constraints:
         sampling="-sampled[0-9]+d?o?",
         weightedness="\\.W|",
+        pathness="\\.path|",
         k="[0-9]+",
         w="[0-9]+",
     threads: 1
