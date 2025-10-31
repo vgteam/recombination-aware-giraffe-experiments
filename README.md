@@ -114,7 +114,7 @@ In these file name templates, `{root}` is your base output directory, `{ext}` is
 
 This repo also includes machinery for doing parameter search experiments, to find the best combinations of parameters for `vg giraffe`, in order to generate Giraffe parameter presets.
 
-To use it, first update `parameter_search_config.tsv` to describe the names of the parameters you want to vary, their Python type (`int` or `float`), their min, max, and current default values, and the sampling strategy to distribute sampled values (`uniform` or `log`). (The default value is used for previously-sampled conditions from before you added the parameter to the file.)
+To use it, first update `parameter_search_config.tsv` to describe the names of the parameters you want to vary, their Python type (`bool`, `int` or `float`, or `flag`), their min, max, and current default values, and the sampling strategy to distribute sampled values (`uniform` or `log`). (The default value is used for previously-sampled conditions from before you added the parameter to the file.) If the min and max values are equal, the type and sampling strategy are ignored. A `flag` parameter is like a `bool`, but the parameter itself is passed or not passed, instead of being passed a bool value.
 
 Then, run `parameter_search.py`, with the `--count` option set to the number of points to sample in multi-dimensional parameter space. This populates `./hash_to_parameters.tsv` with several sample point hash values and their corresponding parameter sets.
 
