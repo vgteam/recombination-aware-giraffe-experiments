@@ -1,4 +1,4 @@
 #name	type	min_val	max_val	default	sampling_strategy
 rec-mode	flag	true	true	true	uniform
-rec-penalty-chain	int	0	20	0	uniform
-rec-penalty-fragment	int	0	20	0	uniform
+rec-penalty-chain	int	0	100	0	uniform
+rec-penalty-fragment	int	0	4	0	uniform

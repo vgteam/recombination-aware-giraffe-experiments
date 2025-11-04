@@ -1488,6 +1488,11 @@ def get_vg_flags(wildcard_flag):
     match wildcard_flag:
         case "recpenalty":
             return "--rec-mode --rec-penalty-chain 4 --rec-penalty-fragment 2"
+        case s if s.startswith("rpf") and "rpc" in s:
+            # TODO: We *should* just use this regex as a pattern in the match,
+            # but Python doesn't support that.
+            match = re.fullmatch("rpf([0-9]+)rpc([0-9]+)", s)
+            return f"--rec-mode --rec-penalty-fragment {match.group(1)} --rec-penalty-chain {match.group(2)}"
         case "noflags":
             return ""
         case unknown:

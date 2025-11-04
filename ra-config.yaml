@@ -99,6 +99,6 @@ experiments:
       reference: chm13
       sample: HG002
       realness: sim
-      refgraph: "hprc-v2.0-mc-eval.ec1M-sampled16o"
     vary:
-      mapper: ["giraffe-k31.w50.W-hifi-498236-noflags", "giraffe-k31.w50.W.path-hifi-498236-recpenalty", "giraffe-k31.w50.W-hifi-ce3885-noflags"]
+      refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o", "hprc-v2.0-mc-eval.ec1M-sampled32o"]
+      mapper: ["giraffe-k31.w50.W-hifi-498236-noflags", "giraffe-k31.w50.W.path-hifi-498236-rpf1rpc33", "giraffe-k31.w50.W.path-hifi-498236-rpf1rpc86"]
