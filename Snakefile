@@ -995,7 +995,7 @@ def indexed_graph(wildcards):
     else:
         # Use zipcodes
         new_indexes = {
-            "minfile": base + "." + wildcards["minparams"] + ".withzip.min",
+            "minfile": base + "." + wildcards["minparams"] + (".withzip" if not wildcards["minparams"].endswith(".path") else "") + ".min",
             "zipfile": base + "." + wildcards["minparams"] + ".zipcodes"
         }
     new_indexes.update(indexes)
@@ -1784,12 +1784,15 @@ rule minimizer_index_graph:
     input:
         unpack(dist_indexed_graph)
     output:
-        minfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}{pathness}.withzip.min",
+        minfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}{pathness}{withzipiness}.min",
         zipfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}{pathness}.zipcodes"
     benchmark: "{graphs_dir}/indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}{pathness}.benchmark"
     wildcard_constraints:
         weightedness="\\.W|",
         pathness="\\.path|",
+        # If not a .path.min, we need to make a .withzip.min
+        # TODO: Ban plain .min
+        withzipiness="\\.withzip|",
         k="[0-9]+",
         w="[0-9]+"
     params:
