@@ -1784,27 +1784,43 @@ rule minimizer_index_graph:
     input:
         unpack(dist_indexed_graph)
     output:
-        minfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}{pathness}{withzipiness}.min",
-        zipfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}{pathness}.zipcodes"
-    benchmark: "{graphs_dir}/indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}{pathness}.benchmark"
+        minfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.withzip.min",
+        zipfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.zipcodes"
+    benchmark: "{graphs_dir}/indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.benchmark"
     wildcard_constraints:
         weightedness="\\.W|",
-        pathness="\\.path|",
-        # If not a .path.min, we need to make a .withzip.min
-        # TODO: Ban plain .min
-        withzipiness="\\.withzip|",
         k="[0-9]+",
         w="[0-9]+"
     params:
         weighting_option=lambda w: "--weighted" if w["weightedness"] == ".W" else "",
-        path_option=lambda w: "--rec-mode" if w["pathness"] == ".path" else "",
     threads: 16
     resources:
         mem_mb=lambda w: 600000 if ("hprc-v2" in w["refgraphbase"]  or "hprc-v1.1-nov.11.2024" in w["refgraphbase"]) else 320000 if w["weightedness"] == ".W" else 80000,
         runtime=240,
         slurm_partition=choose_partition(240)
     shell:
-        "vg minimizer --progress -k {wildcards.k} -w {wildcards.w} {params.weighting_option} {params.path_option} -t {threads} -p -d {input.dist} -z {output.zipfile} -o {output.minfile} {input.gbz}"
+        "vg minimizer --progress -k {wildcards.k} -w {wildcards.w} {params.weighting_option} -t {threads} -p -d {input.dist} -z {output.zipfile} -o {output.minfile} {input.gbz}"
+
+rule path_minimizer_index_graph:
+    input:
+        unpack(dist_indexed_graph)
+    output:
+        minfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.path.min",
+        zipfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.path.zipcodes"
+    benchmark: "{graphs_dir}/indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.path.benchmark"
+    wildcard_constraints:
+        weightedness="\\.W|",
+        k="[0-9]+",
+        w="[0-9]+"
+    params:
+        weighting_option=lambda w: "--weighted" if w["weightedness"] == ".W" else "",
+    threads: 16
+    resources:
+        mem_mb=lambda w: 600000 if ("hprc-v2" in w["refgraphbase"]  or "hprc-v1.1-nov.11.2024" in w["refgraphbase"]) else 320000 if w["weightedness"] == ".W" else 80000,
+        runtime=240,
+        slurm_partition=choose_partition(240)
+    shell:
+        "vg minimizer --progress -k {wildcards.k} -w {wildcards.w} {params.weighting_option} --rec-mode -t {threads} -p -d {input.dist} -z {output.zipfile} -o {output.minfile} {input.gbz}"
 
 rule non_zipcode_minimizer_index_graph:
     input:
