@@ -118,7 +118,20 @@ To use it, first update `parameter_search_config.tsv` to describe the names of t
 
 Then, run `parameter_search.py`, with the `--count` option set to the number of points to sample in multi-dimensional parameter space. This populates `./hash_to_parameters.tsv` with several sample point hash values and their corresponding parameter sets.
 
-Then use Snakemake to request any of the parameter search plots, such as `{root}/parameter_search/plots/chm13/hprc-v1.1-mc-sampled4o/giraffe-k29.w11.W-sr-default/HG002.100000/illumina.correct_speed_vs_hit-cap.png`. This will use the current default `vg` binary, with the `sr` preset, on 100000 Illumina reads, against a haplotype-sampled version of the HPRC v1.1 graph, and make a plot of simulated read correctness and real read mapping speed as a function of the `hit-cap` parameter (assuming it's defined as one of the parameters to vary). There are other Snakemake rules available for files in `parameter_search` that can make parametric plots of pairs of real or simulated alignment statistics, or plot those statistics against parameter values. 
+Then use Snakemake to request any of the parameter search plots, such as `{root}/parameter_search/plots/chm13/hprc-v1.1-mc-sampled4o/giraffe-k29.w11.W-sr-default/HG002.100000/illumina.correct_speed_vs_hit-cap.png`. This will use the current default `vg` binary, with the `sr` preset, on 100000 Illumina reads, against a haplotype-sampled version of the HPRC v1.1 graph, and make a plot of simulated read correctness and real read mapping speed as a function of the `hit-cap` parameter (assuming it's defined as one of the parameters to vary). There are other Snakemake rules available for files in `parameter_search` that can make parametric plots of pairs of real or simulated alignment statistics, or plot those statistics against parameter values.
+
+## Available Parameter Search Plots
+
+In these file name templates:
+* `{root}` is your base output directory.
+* `{ext}` is the image format you want the plot in, such as `png`.
+* `{parameter}` is any parameter named in `parameter_search_config.tsv`.
+
+The other placeholders define the alignment setup where the parameter search will be run, the parameter axes along which you want to look, or the alignment statistics that you want plotted. 
+
+* `{root}/parameter_search/plots/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}/{sample}{trimmedness}.{subset}/{tech}.correct_speed_vs_{parameter}.{ext}`: A chart of simulated read correctness and real read mapping speed as a function of the specified parameter.
+* `{root}/parameter_search/plots/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}/{sample}{trimmedness}.{subset}/{tech}.{realness}.{statname}_vs_{parameter}.{ext}`: A chart of any alignment statistic as a function of the specified parameter.
+* `{root}/parameter_search/plots/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}/{sample}{trimmedness}.{subset}/{tech}.parametric.{realnessy}.{statnamey}_vs_{realnessx}.{statnamex}.{ext}`: A parametric scatter plot showing one alignment statistic versus another alignment statistic, across all parameter sets from `parameter_search_config.tsv`.
 
 # Multi-User Operation
 
