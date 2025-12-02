@@ -5016,7 +5016,7 @@ rule read_length_by_name:
         slurm_partition=choose_partition(720)
     shell:
         """
-        seqkit fx2tab -n -l {input.fastq} | sort -k 1b,1 | awk -v OFS='\t' '{{print $1,$NF}}' >{output.tsv}
+        seqkit fx2tab -n -l {input.fastq} | awk -v OFS='\t' '{{print $1,$NF}}' | sort -k 1,1 >{output.tsv}
         """
 #How many base pairs are in the read file
 rule read_bases_total:
