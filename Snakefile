@@ -1493,6 +1493,8 @@ def get_vg_flags(wildcard_flag):
             # but Python doesn't support that.
             match = re.fullmatch("rpf([0-9]+)rpc([0-9]+)", s)
             return f"--rec-mode --rec-penalty-fragment {match.group(1)} --rec-penalty-chain {match.group(2)}"
+        case "nofrag":
+            return "--skip-fragmenting"
         case "noflags":
             return ""
         case unknown:
