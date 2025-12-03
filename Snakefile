@@ -1142,7 +1142,7 @@ def mapper_stages(wildcards):
         parts = wildcards["mapper"].split("-")
         assert len(parts) >= 3
         # Should be giraffe, then the minimizer parameters, then the parameter preset.
-        if parts[3] == "default":
+        if parts[2] == "default":
             # Default mapping preset is non-chaining
             return NON_CHAINING_STAGES
         else:
@@ -2226,6 +2226,32 @@ rule giraffe_real_reads:
         zipcodes_flag=f"-z {input.zipfile}" if "zipfile" in dict(input).keys() else ""
 
         shell(vg_binary + " giraffe -t{threads} --parameter-preset {wildcards.preset} --progress -Z {input.gbz} -d {input.dist} -m {input.minfile} -f {input.fastq_gz} " + zipcodes_flag + " " + flags + " " + pairing_flag + " >{output.gam} 2>{log}")
+
+rule giraffe_real_reads_provenance:
+    input:
+        unpack(indexed_graph),
+        fastq_gz=fastq_gz,
+    output:
+        # Giraffe can dump out pre-annotated reads at annotation range -1.
+        gam="{root}/aligned/{reference}/{refgraph}/giraffe-{minparams}-{preset}-{vgversion}-{vgflag}/{realness}/{tech}/{sample}{trimmedness}.{subset}.prov.gam"
+    wildcard_constraints:
+        realness="real"
+    threads: auto_mapping_threads
+    params:
+        exclusive_timing=exclusive_timing 
+    resources:
+        mem_mb=auto_mapping_memory,
+        runtime=1200,
+        slurm_partition=choose_partition(1200),
+        slurm_extra=auto_mapping_slurm_extra,
+        full_cluster_nodes=auto_mapping_full_cluster_nodes
+    run:
+        vg_binary = get_vg_version(wildcards.vgversion)
+        flags=get_vg_flags(wildcards.vgflag)
+        pairing_flag="-i" if wildcards.preset == "default" else ""
+        zipcodes_flag=f"-z {input.zipfile}" if "zipfile" in dict(input).keys() else ""
+
+        shell(vg_binary + " giraffe -t{threads} --track-provenance --parameter-preset {wildcards.preset} --progress -Z {input.gbz} -d {input.dist} -m {input.minfile} -f {input.fastq_gz} " + zipcodes_flag + " " + flags + " " + pairing_flag + " >{output.gam}")
 
 rule giraffe_sim_reads:
     input:
@@ -3331,7 +3357,7 @@ rule speed_from_log_giraffe_stats:
         runtime=5,
         slurm_partition=choose_partition(5)
     shell:
-        "echo \"$(cat {input.giraffe_log} | grep \"reads per CPU-second\" | sed \'s/Achieved \([0-9]*\.[0-9]*\) reads per CPU-second.*/\\1/g\')\" >{output.tsv}"
+        "echo \"$(cat {input.giraffe_log} | grep \"reads per CPU-second\" | sed \'s/.*Achieved \([0-9]*\.[0-9]*\) reads per CPU-second.*/\\1/g\')\" >{output.tsv}"
 
 rule speed_from_log_giraffe:
     input:
@@ -3350,7 +3376,7 @@ rule speed_from_log_giraffe:
         runtime=5,
         slurm_partition=choose_partition(5)
     shell:
-        "echo \"{params.condition_name}\t$(cat {input.giraffe_log} | grep \"reads per CPU-second\" | sed \'s/Achieved \([0-9]*\.[0-9]*\) reads per CPU-second.*/\\1/g\')\" >{output.tsv}"
+        "echo \"{params.condition_name}\t$(cat {input.giraffe_log} | grep \"reads per CPU-second\" | sed \'s/.*Achieved \([0-9]*\.[0-9]*\) reads per CPU-second.*/\\1/g\')\" >{output.tsv}"
 
 #Put the mapper name and memory into a tsv in experiments directory for the experiment
 #This makes it easier to find for different mappers that may or may not have a refgraph in the path
@@ -3371,7 +3397,7 @@ rule memory_from_log_giraffe_experiment:
         runtime=5,
         slurm_partition=choose_partition(5)
     shell:
-        "echo \"{params.condition_name}\t$(cat {input.giraffe_log} | grep \"Memory footprint\" | sed \'s/Memory footprint: \([0-9]*\.[0-9]*\) GB.*/\\1/g\')\" >{output.tsv}"
+        "echo \"{params.condition_name}\t$(cat {input.giraffe_log} | grep \"Memory footprint\" | sed \'s/.*Memory footprint: \([0-9]*\.[0-9]*\) GB.*/\\1/g\')\" >{output.tsv}"
 
 #Put just the memory use in the stats folder for parameter search
 rule memory_from_log_giraffe_stat:
@@ -3388,7 +3414,7 @@ rule memory_from_log_giraffe_stat:
         runtime=5,
         slurm_partition=choose_partition(5)
     shell:
-        "echo \"$(cat {input.giraffe_log} | grep \"Memory footprint\" | sed \'s/Memory footprint: \([0-9]*\.[0-9]*\) GB.*/\\1/g\')\" >{output.tsv}"
+        "echo \"$(cat {input.giraffe_log} | grep \"Memory footprint\" | sed \'s/.*Memory footprint: \([0-9]*\.[0-9]*\) GB.*/\\1/g\')\" >{output.tsv}"
 
 rule speed_from_log_bwa:
     input:
@@ -4854,6 +4880,24 @@ rule stage_time_sim:
     shell:
         "vg filter -t {threads} -T \"annotation.stage.{wildcards.stage}.time\" {input.gam} | grep -v \"#\" >{output}"
 
+rule stage_time_real_prov:
+    input:
+        # Real reads need a separate run with provenance tracking
+        gam="{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.prov.gam",
+    output:
+        "{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.stage_{stage}_time.tsv"
+    wildcard_constraints:
+        realness="real",
+        # Only allow for a small set
+        subset="1k"
+    threads: 5
+    resources:
+        mem_mb=2000,
+        runtime=60,
+        slurm_partition=choose_partition(60)
+    shell:
+        "vg filter -t {threads} -T \"annotation.stage.{wildcards.stage}.time\" {input.gam} | grep -v \"#\" >{output}"
+
 rule aligner_part_stat:
     input:
         gam="{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam",
@@ -5016,7 +5060,7 @@ rule read_length_by_name:
         slurm_partition=choose_partition(720)
     shell:
         """
-        seqkit fx2tab -n -l {input.fastq} | awk -v OFS='\t' '{{print $1,$NF}}' | sort -k 1,1 >{output.tsv}
+        seqkit fx2tab -n -l {input.fastq} | sort -k 1b,1 | awk -v OFS='\t' '{{print $1,$NF}}' >{output.tsv}
         """
 #How many base pairs are in the read file
 rule read_bases_total:
@@ -5679,7 +5723,7 @@ rule average_stage_time_barchart:
         mapper_stages=mapper_stages
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=1024,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:

@@ -102,3 +102,36 @@ experiments:
     vary:
       refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
       mapper: ["giraffe-k31.w50.W-hifi-default-noflags", "giraffe-k31.w50.W-hifi-default-nofrag"]
+
+  hifi_sim_100k:
+    control:
+      subset: 100k
+      tech: hifi
+      reference: chm13
+      sample: HG002
+      realness: sim
+    vary:
+      refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
+      mapper: ["giraffe-k31.w50.W-hifi-default-noflags", "giraffe-k31.w50.W-hifi-default-nofrag"]
+
+  hifi_real_100k:
+    control:
+      subset: 100k
+      tech: hifi
+      reference: chm13
+      sample: HG002
+      realness: real
+    vary:
+      refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
+      mapper: ["giraffe-k31.w50.W-hifi-default-noflags", "giraffe-k31.w50.W-hifi-default-nofrag"]
+
+  hifi_sim_1m:
+    control:
+      subset: 1m
+      tech: hifi
+      reference: chm13
+      sample: HG002
+      realness: sim
+    vary:
+      refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
+      mapper: ["giraffe-k31.w50.W-hifi-default-noflags", "giraffe-k31.w50.W-hifi-default-nofrag"]
