@@ -101,7 +101,7 @@ experiments:
       realness: sim
     vary:
       refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-hifi-default-noflags", "giraffe-k31.w50.W-hifi-default-nofrag"]
+      mapper: ["giraffe-k31.w50.W-hifi-74fb0b-noflags", "giraffe-k31.w50.W-hifi-d1625a-noflags", "giraffe-k31.w50.W-hifi-aa8171-noflags"]
 
   hifi_sim_100k:
     control:
@@ -112,7 +112,7 @@ experiments:
       realness: sim
     vary:
       refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-hifi-default-noflags", "giraffe-k31.w50.W-hifi-default-nofrag"]
+      mapper: ["giraffe-k31.w50.W-hifi-74fb0b-noflags", "giraffe-k31.w50.W-hifi-d1625a-noflags", "giraffe-k31.w50.W-hifi-aa8171-noflags"]
 
   hifi_real_100k:
     control:
@@ -123,7 +123,7 @@ experiments:
       realness: real
     vary:
       refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-hifi-default-noflags", "giraffe-k31.w50.W-hifi-default-nofrag"]
+      mapper: ["giraffe-k31.w50.W-hifi-74fb0b-noflags", "giraffe-k31.w50.W-hifi-d1625a-noflags", "giraffe-k31.w50.W-hifi-aa8171-noflags"]
 
   hifi_sim_1m:
     control:
@@ -134,4 +134,27 @@ experiments:
       realness: sim
     vary:
       refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-hifi-default-noflags", "giraffe-k31.w50.W-hifi-default-nofrag"]
+      mapper: ["giraffe-k31.w50.W-hifi-74fb0b-noflags", "giraffe-k31.w50.W-hifi-d1625a-noflags", "giraffe-k31.w50.W-hifi-aa8171-noflags"]
+
+
+  r10y2025_sim_100k:
+    control:
+      subset: 100k
+      tech: r10y2025
+      reference: chm13
+      sample: HG002
+      realness: sim
+    vary:
+      refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
+      mapper: ["giraffe-k31.w50.W-r10-74fb0b-noflags", "giraffe-k31.w50.W-r10-d1625a-noflags", "giraffe-k31.w50.W-r10-aa8171-noflags"]
+
+  r10y2025_real_100k:
+    control:
+      subset: 100k
+      tech: r10y2025
+      reference: chm13
+      sample: HG002
+      realness: real
+    vary:
+      refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
+      mapper: ["giraffe-k31.w50.W-r10-74fb0b-noflags", "giraffe-k31.w50.W-r10-d1625a-noflags", "giraffe-k31.w50.W-r10-aa8171-noflags"]
