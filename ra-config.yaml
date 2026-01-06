@@ -141,7 +141,6 @@ experiments:
     vary:
       mapper: ["giraffe-k31.w50.W-hifi-0793c7-noflags", "giraffe-k31.w50.W-hifi-55e964-noflags"]
 
-
   hifi_sim_1m:
     control:
       subset: 1m
@@ -152,7 +151,6 @@ experiments:
     vary:
       refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
       mapper: ["giraffe-k31.w50.W-hifi-74fb0b-noflags", "giraffe-k31.w50.W-hifi-d1625a-noflags", "giraffe-k31.w50.W-hifi-aa8171-noflags"]
-
 
   r10y2025_sim_100k:
     control:
@@ -175,3 +173,52 @@ experiments:
     vary:
       refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
       mapper: ["giraffe-k31.w50.W-r10-74fb0b-noflags", "giraffe-k31.w50.W-r10-d1625a-noflags", "giraffe-k31.w50.W-r10-aa8171-noflags"]
+
+  r10y2025_real_full_call_chm13:
+    control:
+      subset: full
+      tech: r10y2025
+      reference: chm13
+      sample: HG002
+      realness: real
+      refgraph: "hprc-v2.0-mc-eval.ec1M-sampled16o"
+      callparams: ".nomodel"
+      # SV specific parameters with generic names
+      caller: vgcall
+      truthset: giab6
+      truthref: chm13
+    vary:
+      mapper: ["giraffe-k31.w50.W-r10-0793c7-noflags", "giraffe-k31.w50.W-r10-55e964-noflags"]
+
+  illuminachaining_real_full_call_chm13:
+    control:
+      subset: full
+      tech: illumina
+      reference: chm13
+      sample: HG002
+      realness: real
+      refgraph: "hprc-v2.0-mc-eval.ec1M-sampled16o"
+      callparams: ".nomodel"
+      # SV specific parameters with generic names
+      caller: vgcall
+      truthset: giab6
+      truthref: chm13
+    vary:
+      mapper: ["giraffe-k31.w50.W-chaining-sr-0793c7-noflags", "giraffe-k31.w50.W-chaining-sr-55e964-noflags"]
+
+  illumina_real_full_call_chm13:
+    control:
+      subset: full
+      tech: illumina
+      reference: chm13
+      sample: HG002
+      realness: real
+      refgraph: "hprc-v2.0-mc-eval.ec1M-sampled16o"
+      callparams: ".nomodel"
+      # SV specific parameters with generic names
+      caller: vgcall
+      truthset: giab6
+      truthref: chm13
+    vary:
+      mapper: ["giraffe-k31.w50.W-default-0793c7-noflags", "giraffe-k31.w50.W-default-55e964-noflags"]
+

@@ -262,6 +262,8 @@ wildcard_constraints:
     trimmedness="\\.trimmed|",
     sample=".+(?<!\\.trimmed)",
     basename=".+(?<!\\.trimmed)",
+    minparams="([a-zA-Z0-9]+)(\\.[a-zA-Z0-9]+)*",
+    preset="(default|r10|hifi|chaining-sr)",
     subset="([0-9]+[km]?|full)",
     category="((not_)?(centromeric))?|",
     # We can restrict calling to a small region for testing
@@ -2363,14 +2365,14 @@ rule minimap2_index_reference:
     input:
         reference_fasta=REFS_DIR + "/{basename}.fa"
     output:
-        index=REFS_DIR + "/{basename}.{preset}.mmi"
+        index=REFS_DIR + "/{basename}.{mmpreset}.mmi"
     threads: 16
     resources:
         mem_mb=16000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
-         "minimap2 -t {threads} -x {wildcards.preset} -d {output.index} {input.reference_fasta}"
+         "minimap2 -t {threads} -x {wildcards.mmpreset} -d {output.index} {input.reference_fasta}"
 
 
 # Note: This changes the simulated read names so that it will be run paired ended.
