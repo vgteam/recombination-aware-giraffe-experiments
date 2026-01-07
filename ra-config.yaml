@@ -161,7 +161,7 @@ experiments:
       realness: sim
     vary:
       refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-r10-74fb0b-noflags", "giraffe-k31.w50.W-r10-d1625a-noflags", "giraffe-k31.w50.W-r10-aa8171-noflags"]
+      mapper: ["giraffe-k31.w50.W-r10-0793c7-noflags", "giraffe-k31.w50.W-r10-55e964-noflags"]
 
   r10y2025_real_100k:
     control:
@@ -172,7 +172,7 @@ experiments:
       realness: real
     vary:
       refgraph: ["hprc-v2.0-mc-eval.ec1M-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-r10-74fb0b-noflags", "giraffe-k31.w50.W-r10-d1625a-noflags", "giraffe-k31.w50.W-r10-aa8171-noflags"]
+      mapper: ["giraffe-k31.w50.W-r10-0793c7-noflags", "giraffe-k31.w50.W-r10-55e964-noflags"]
 
   r10y2025_real_full_call_chm13:
     control:
