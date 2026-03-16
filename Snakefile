@@ -5788,7 +5788,7 @@ rule average_stage_time_barchart:
         mapper_stages=mapper_stages
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5801,7 +5801,7 @@ rule average_aligner_time_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/average_aligner_time-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5814,7 +5814,7 @@ rule total_aligner_time_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/total_aligner_time-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5828,7 +5828,7 @@ rule average_aligner_bases_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/average_aligner_bases-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5841,7 +5841,7 @@ rule average_aligner_invocations_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/average_aligner_invocations-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5854,7 +5854,7 @@ rule average_aligner_fraction_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/average_aligner_fraction-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5880,7 +5880,7 @@ rule average_aligner_probsize_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/average_aligner_probsize-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
