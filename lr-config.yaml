@@ -577,14 +577,14 @@ experiments:
       reference: chm13
       sample: HG002
       realness: real
-      refgraph: "hprc-v2.0-mc-eval.ec1M-sampled16o"
+      refgraph: "hprc-v2.1-mc-eval-sampled16o"
       callparams: ".model2025-03-26noinfo"
       # SV specific parameters with generic names
       caller: vgcall
       truthset: giab6
       truthref: chm13
     vary:
-      mapper: ["giraffe-k31.w50.W-hifi-99930d-mmcs100", "giraffe-k31.w50.W-hifi-8a0e9e-noflags", "giraffe-k31.w50.W-hifi-3543a2-noflags"]
+      mapper: ["giraffe-k31.w50.W-hifi-v1.73.0-noflags", "giraffe-k31.w50.W-hifi-175171-noflags"]
 
   hifi_real_dvdebug_grch38:
     control:
@@ -674,14 +674,14 @@ experiments:
       reference: chm13
       sample: HG002
       realness: real
-      refgraph: "hprc-v2.0-mc-eval.ec1M-sampled16o"
+      refgraph: "hprc-v2.1-mc-eval-sampled16o"
       callparams: ".nomodel"
       # SV specific parameters with generic names
       caller: vgcall
       truthset: giab6
       truthref: chm13
     vary:
-      mapper: ["giraffe-k31.w50.W-r10-99930d-noflags", "giraffe-k31.w50.W-r10-8a0e9e-noflags", "giraffe-k31.w50.W-r10-3543a2-noflags"]
+      mapper: ["giraffe-k31.w50.W-r10-v1.73.0-noflags", "giraffe-k31.w50.W-r10-175171-noflags"]
       
 
   r10y2025_real_100k:
@@ -691,9 +691,42 @@ experiments:
       tech: r10y2025
       sample: HG002
       realness: real
-      refgraph: "hprc-v2.0-mc-eval.ec1M-sampled16o"
+      refgraph: "hprc-v2.1-mc-eval-sampled16o"
     vary:
-      mapper: ["winnowmap", "giraffe-k31.w50.W-r10-99930d-noflags"]
+      mapper: ["giraffe-k31.w50.W-r10-v1.73.0-noflags", "giraffe-k31.w50.W-r10-175171-noflags"]
+
+  hifi_real_100k:
+    control:
+      subset: 100k
+      reference: chm13
+      tech: hifi
+      sample: HG002
+      realness: real
+      refgraph: "hprc-v2.1-mc-eval-sampled16o"
+    vary:
+      mapper: ["giraffe-k31.w50.W-hifi-v1.73.0-noflags", "giraffe-k31.w50.W-hifi-175171-noflags"]
+
+  r10y2025_sim_100k:
+    control:
+      subset: 100k
+      reference: chm13
+      tech: r10y2025
+      sample: HG002
+      realness: sim
+      refgraph: "hprc-v2.1-mc-eval-sampled16o"
+    vary:
+      mapper: ["giraffe-k31.w50.W-r10-v1.73.0-noflags", "giraffe-k31.w50.W-r10-175171-noflags"]
+
+  hifi_sim_100k:
+    control:
+      subset: 100k
+      reference: chm13
+      tech: hifi
+      sample: HG002
+      realness: sim
+      refgraph: "hprc-v2.1-mc-eval-sampled16o"
+    vary:
+      mapper: ["giraffe-k31.w50.W-hifi-v1.73.0-noflags", "giraffe-k31.w50.W-hifi-175171-noflags"]
 
   illumina_sim_graphs:
     control:
