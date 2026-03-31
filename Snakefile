@@ -1833,7 +1833,8 @@ rule kmer_count_full_sample:
         tmpdir=LARGE_TEMP_DIR
     shell:
         # Need to cut the extension off the output file because KMC will supply it.
-        "kmc -k29 -m128 -okff -t{threads} -hp {input.base_fastq_gz} {params.output_basename} \"$TMPDIR\""
+        # Need to use a unique temp directory
+        "COUNT_DIR=\"$(mktemp -d)\"; kmc -k29 -m128 -okff -t{threads} -hp {input.base_fastq_gz} {params.output_basename} \"$COUNT_DIR\"; rm -Rf \"$COUNT_DIR\""
 
 rule haplotype_sample_graph:
     input:
