@@ -584,7 +584,7 @@ experiments:
       truthset: giab6
       truthref: chm13
     vary:
-      mapper: ["giraffe-k31.w50.W-hifi-v1.73.0-noflags", "giraffe-k31.w50.W-hifi-175171-noflags"]
+      mapper: ["giraffe-k31.w50.W-hifi-v1.73.0-noflags", "giraffe-k31.w50.W-hifi-175171-noflags", "giraffe-k31.w50.W-hifi-175171-ib9", "giraffe-k31.w50.W-hifi-175171-ib0"]
 
   hifi_real_dvdebug_grch38:
     control:

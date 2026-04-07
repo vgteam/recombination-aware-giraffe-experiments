@@ -1569,6 +1569,8 @@ def get_vg_flags(wildcard_flag):
             return "--max-min-chain-score " + mmcs_number[4:]
         case "candidate1":
             return "--max-min-chain-score 60 --chain-score-threshold 150"
+        case item_bonus if item_bonus[0:2] == "ib":
+            return "--item-bonus " + item_bonus[2:]
         case "noflags":
             return ""
         case unknown:
@@ -5345,13 +5347,26 @@ rule score_gam:
         gam="{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
     output:
         tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.score.tsv"
-    threads: 2
+    threads: 16
     resources:
-        mem_mb=2000,
+        mem_mb=20000,
         runtime=60,
         slurm_partition=choose_partition(60)
     shell:
         "vg filter -t {threads} -T 'score' {input.gam} | grep -v '#' > {output.tsv}"
+
+rule mapped_score_gam:
+    input:
+        gam="{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
+    output:
+        tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.mapped_score.tsv"
+    threads: 16
+    resources:
+        mem_mb=20000,
+        runtime=60,
+        slurm_partition=choose_partition(60)
+    shell:
+        "vg filter -t {threads} --min-primary 1 -T 'score' {input.gam} | grep -v '#' > {output.tsv}"
         
 rule hardclips:
     input:
