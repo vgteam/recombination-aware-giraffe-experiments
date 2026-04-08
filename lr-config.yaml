@@ -83,7 +83,7 @@
 #reads_dir: "/private/groups/patenlab/xhchang/reads"
 #all_out_dir: "outputs"
 real_slurm_extra: "--exclude=phoenix-[00-10,22-24]"
-exclusive_timing: true
+exclusive_timing: false
 min_exclusive_reads: 1000000
 # Note that reserving a full node is the only way we have to ensure a job is not split across NUMA nodes
 
@@ -584,7 +584,7 @@ experiments:
       truthset: giab6
       truthref: chm13
     vary:
-      mapper: ["giraffe-k31.w50.W-hifi-v1.73.0-noflags", "giraffe-k31.w50.W-hifi-175171-noflags", "giraffe-k31.w50.W-hifi-175171-ib9", "giraffe-k31.w50.W-hifi-175171-ib0"]
+      mapper: ["giraffe-k31.w50.W-hifi-v1.73.0-noflags", "giraffe-k31.w50.W-hifi-175171-noflags", "giraffe-k31.w50.W-hifi-175171-ib9", "giraffe-k31.w50.W-hifi-175171-ib0", "giraffe-k31.w50.W-hifi-175171-proposed1"]
 
   hifi_real_dvdebug_grch38:
     control:

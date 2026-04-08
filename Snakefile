@@ -1571,6 +1571,8 @@ def get_vg_flags(wildcard_flag):
             return "--max-min-chain-score 60 --chain-score-threshold 150"
         case item_bonus if item_bonus[0:2] == "ib":
             return "--item-bonus " + item_bonus[2:]
+        case "proposed1":
+            return "--item-bonus 2 --max-min-chain-score 52"
         case "noflags":
             return ""
         case unknown:
