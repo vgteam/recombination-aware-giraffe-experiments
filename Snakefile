@@ -374,7 +374,7 @@ def auto_mapping_runtime(wildcards):
     # TODO: Also scale up as threads goes down
     return base_time * scale_down
 
-def auto_partition(wildcards):
+def auto_mapping_partition(wildcards):
     """
     Determine the partition to use for Giraffe mapping, from subset and realness.
     """
