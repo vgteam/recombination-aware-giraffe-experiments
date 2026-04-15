@@ -350,7 +350,7 @@ def auto_mapping_memory(wildcards):
     elif wildcards["tech"] == "r10":
         scale_mb = 600000
     elif wildcards["tech"] == "r10y2025":
-        scale_mb = 300000
+        scale_mb = 400000
     else:
         scale_mb = 210000
 
@@ -1596,6 +1596,8 @@ def get_vg_flags(wildcard_flag):
             return "--item-bonus " + item_bonus[2:]
         case "proposed1":
             return "--item-bonus 2 --max-min-chain-score 52"
+        case "proposed2":
+            return "--chain-score-threshold 234 --min-chains 2 --min-chain-score-per-base 0.24 --max-min-chain-score 46 --max-chains-per-tree 3 --item-bonus 2 --gap-scale 0.27579"
         case "noflags":
             return ""
         case unknown:
