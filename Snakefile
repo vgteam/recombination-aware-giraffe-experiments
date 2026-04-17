@@ -1604,6 +1604,8 @@ def get_vg_flags(wildcard_flag):
             return "--chain-score-threshold 175 --min-chain-score-per-base 0.01124408616 --max-min-chain-score 1142 --item-bonus 1 --gap-scale 0.06354"
         case "r10prop3":
             return "--chain-score-threshold 127 --min-chain-score-per-base 0.01785608793 --max-min-chain-score 707 --item-bonus 17 --gap-scale 0.10195"
+        case "r10prop4":
+            return "--chain-score-threshold 146 --min-chain-score-per-base 0.01206701239 --max-min-chain-score 2227 --item-bonus 19 --gap-scale 0.04244"
         case "noflags":
             return ""
         case unknown:
