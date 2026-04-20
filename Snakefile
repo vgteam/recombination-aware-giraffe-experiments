@@ -52,6 +52,7 @@ configfile: "ra-config.yaml"
 # hprc-v1.1-mc-chm13.fragment.hapl
 #
 GRAPHS_DIR = config.get("graphs_dir", None) or "/private/groups/patenlab/anovak/projects/hprc/lr-giraffe/graphs"
+INDEX_DIR = config.get("index_dir", None) or GRAPHS_DIR
 
 #
 # For SV calling, we need a truth vcf and a BED file with confident regions
@@ -148,7 +149,9 @@ READS_DIR = config.get("reads_dir", None) or "/private/groups/patenlab/anovak/pr
 # A FASTA file with PanSN-style (CHM13#0#chr1) contig names: 
 # chm13-pansn-newY.fa
 #
-# (For grch38 we don't use the -newY part.)
+# (For grch38 we don't use the -newY part. If using the HPRCv1.1 graphs, we
+# also need a version without -newY containing CHM13 as used for HPRC1.1, with
+# its old Y and its old rotation of chrM.)
 #
 # For the calling references (chm13v2.0 and grch38) we also need a plain .fa
 # and .fa.fai without pansn names, and _PAR.bed files with the pseudo-autosomal
@@ -239,13 +242,17 @@ IMPORTANT_STATS_TABLE_COLUMNS=config.get("important_stats_table_columns", ["spee
 NON_ZIPCODE_GIRAFFE_VERSIONS = set(config.get("non_zipcode_giraffe_versions")) if "non_zipcode_giraffe_versions" in config else set()
 
 # What version of vg should be used to make fragment-aware haplotype indexes?
-VG_FRAGMENT_HAPLOTYPE_INDEXING_VERSION="v1.70.0"
+VG_FRAGMENT_HAPLOTYPE_INDEXING_VERSION="v1.73.0"
 # What version of vg should be used to haplotype-sample graphs?
-VG_HAPLOTYPE_SAMPLING_VERSION="v1.70.0"
+VG_HAPLOTYPE_SAMPLING_VERSION="v1.73.0"
 # What version of vg should be used to haplotype-sample graphs when we want to keep just one reference?
-VG_HAPLOTYPE_SAMPLING_ONEREF_VERSION="v1.70.0"
+VG_HAPLOTYPE_SAMPLING_ONEREF_VERSION="v1.73.0"
 # What version of vg should be used to surject reads?
-VG_SURJECT_VERSION="v1.70.0"
+VG_SURJECT_VERSION="v1.73.0"
+# What version of vg should be used to make distance indexes?
+VG_DISTANCE_INDEXING_VERSION=config.get("vg_distance_indexing_version", VG_HAPLOTYPE_SAMPLING_VERSION)
+# What version of vg should be used to make minimizer and zipcode indexes?
+VG_MINIMIZER_INDEXING_VERSION=config.get("vg_minimizer_indexing_version", VG_DISTANCE_INDEXING_VERSION)
 
 wildcard_constraints:
     expname="[^/]+",
@@ -259,6 +266,9 @@ wildcard_constraints:
     chopping="\\.unchopped|",
     # After a full graph, we might have sampling stuff in a graph name
     sampling="(-[^-]+)*",
+    # In minimap2 mode specifiers, we replace : with ! so Toil can use the
+    # paths with Singularity, which can't mount anything with : in the path. 
+    minimapmode="[a-zA-Z0-9-!]*", 
     trimmedness="\\.trimmed|",
     sample=".+(?<!\\.trimmed)",
     basename=".+(?<!\\.trimmed)",
@@ -329,7 +339,7 @@ def auto_mapping_full_cluster_nodes(wildcards):
 
 def auto_mapping_memory(wildcards):
     """
-    Determine the memory to use for Giraffe mapping, in MB, from subset and tech.
+    Determine the memory to use for Giraffe mapping, in MB, from subset, realness, and tech.
     """
     thread_count = auto_mapping_threads(wildcards)
 
@@ -338,14 +348,39 @@ def auto_mapping_memory(wildcards):
     if wildcards["tech"] == "illumina" or wildcards["tech"] == "element":
         scale_mb = 200000
     elif wildcards["tech"] == "hifi":
-        scale_mb = 240000
+        scale_mb = 120000
     elif wildcards["tech"] == "r10":
         scale_mb = 600000
+    elif wildcards["tech"] == "r10y2025":
+        scale_mb = 400000
     else:
         scale_mb = 210000
 
     # Scale down memory with threads
     return scale_mb / 64 * thread_count + base_mb
+
+def auto_mapping_runtime(wildcards):
+    """
+    Determine the runtime to use for Giraffe mapping, in minutes, from subset and realness.
+    """
+    thread_count = auto_mapping_threads(wildcards)
+    read_count = subset_to_number(wildcards["subset"])
+
+    base_time = 1200 if wildcards["realness"] == "real" else 600
+    scale_down = 1
+    if read_count <= 100000:
+        scale_down = 0.1
+    elif read_count <= 1000000:
+        scale_down = 0.5
+
+    # TODO: Also scale up as threads goes down
+    return base_time * scale_down
+
+def auto_mapping_partition(wildcards):
+    """
+    Determine the partition to use for Giraffe mapping, from subset and realness.
+    """
+    return choose_partition(auto_mapping_runtime(wildcards))
 
 def choose_partition(minutes):
     """
@@ -463,7 +498,14 @@ def minimap_derivative_mode(wildcards):
     """
     explicit_mode = wildcards.get("minimapmode", None)
     if explicit_mode is not None:
-        return explicit_mode
+        # We can't allow colons in paths that a Toil jobstore or input might
+        # need to be in, or we won't be able to mount those paths into
+        # Singularity containers. So instead of having the colons that appear
+        # in minimap2 mapping presets, we replace them with a different
+        # character (!) that we substitute with colon when building the command
+        # line.
+        # TODO: If these need ! in them we need to decode it too.
+        return explicit_mode.replace("!", ":")
 
     MODE_BY_TECH = {
         "r9": "map-ont",
@@ -499,17 +541,18 @@ def reference_basename(wildcards):
     Find the linear reference base name without extension from a reference.
 
     This reference is used for mapping. Calling may be against a different
-    calling reference (with possibly a different Y) or renamed contigs.
+    calling reference (with possibly a different Y and M) or renamed contigs.
 
     This reference will use PanSN contig names.
     """
     parts = [wildcards["reference"], "pansn"]
     if wildcards["reference"] == "chm13":
         # We want to use a version of the reference FASTA with the "new"
-        # non-HG002, non-GRCh38 Y contig.
+        # non-HG002, non-GRCh38 Y contig, and the new rotation of chrM.
         parts.append("newY")
     elif wildcards["reference"] == "chm13v1":
-        # Use this for the older version, so just chm13 without the v1 and without the newY
+        # Use this for the older version, so just chm13 without the v1 and
+        # without the newY (and with chrM rotated the other way)
         parts[0] = "chm13"
     # We can't take non-N ambiguity codes in the reference.
     parts.append("Nonly")
@@ -735,7 +778,10 @@ def truth_vcf_url(wildcards):
         return  {
             "chm13": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/analysis/NIST_HG002_DraftBenchmark_defrabbV0.018-20240716/CHM13v2.0_HG2-T2TQ100-V1.1.vcf.gz",
             "chm13v1": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/analysis/NIST_HG002_DraftBenchmark_defrabbV0.018-20240716/CHM13v2.0_HG2-T2TQ100-V1.1.vcf.gz",
-            "grch38": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/NISTv4.2.1/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz"
+            # For GRCh38 we have a released truth set
+            #"grch38": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/NISTv4.2.1/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz",
+            # But there's also a Q100-based truth set
+            "grch38": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/analysis/NIST_HG002_DraftBenchmark_defrabbV0.019-20241113/GRCh38_HG2-T2TQ100-V1.1_smvar.vcf.gz"
         }[wildcards["reference"]]
     elif wildcards["sample"] == "HG001":
         return  {
@@ -767,7 +813,10 @@ def truth_bed_url(wildcards):
         return {
             "chm13": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/analysis/NIST_HG002_DraftBenchmark_defrabbV0.018-20240716/CHM13v2.0_HG2-T2TQ100-V1.1_smvar.benchmark.bed",
             "chm13v1": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/analysis/NIST_HG002_DraftBenchmark_defrabbV0.018-20240716/CHM13v2.0_HG2-T2TQ100-V1.1_smvar.benchmark.bed",
-            "grch38": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/NISTv4.2.1/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed"
+            # For GRCh38 we have a released truth set
+            #"grch38": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/NISTv4.2.1/GRCh38/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed"
+            # But there's also a Q100-based truth set
+            "grch38": "https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/AshkenazimTrio/analysis/NIST_HG002_DraftBenchmark_defrabbV0.019-20241113/GRCh38_HG2-T2TQ100-V1.1_smvar.benchmark.bed"
         }[wildcards["reference"]]
     elif wildcards["sample"] == "HG001":
         return  {
@@ -794,11 +843,23 @@ def surjectable_gam(wildcards):
 
     return "{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam".format(**format_data)
 
-def graph_base(wildcards, force_all_refs=False, skip_sampling=False):
+def _base_path(base_dir, wildcards, force_all_refs=False, skip_sampling=False):
     """
-    Find the base name for a collection of graph files from reference and either refgraph or all of refgraphbase, modifications, and clipping.
+    Construct the base path (without extension) for graph and index files.
 
-    For graphs ending in "-sampled" and sampling parameters, autodetects the right haplotype-sampled full graph name to use from tech and sample.
+    This function builds paths like "/path/to/hprc-v1.1-mc-chm13.d9" which can then
+    have extensions added (.gbz for graphs, .dist for distance indexes, .min for
+    minimizer indexes, .zipcodes for zipcode indexes, etc.).
+
+    base_dir: The directory where files should be located. Use GRAPHS_DIR for graph
+              files (.gbz, .hg, .gfa) or INDEX_DIR for index files (.dist, .min,
+              .zipcodes, .ri, .hapl).
+
+    wildcards: Snakemake wildcards describing the graph, including reference genome
+               and various modifications (clipping, chopping, haplotype sampling, etc.).
+
+    For graphs ending in "-sampled" and sampling parameters, autodetects the right
+    haplotype-sampled full graph name to use from tech and sample.
 
     For GraphAligner, selects an unchopped version of the graph based on mapper.
 
@@ -841,7 +902,7 @@ def graph_base(wildcards, force_all_refs=False, skip_sampling=False):
         # And -sampled10d needs to be expanded to say what sample and read set we are haplotype sampling from.
 
         # TODO: If it's not -mc, where would the reference go?
-        
+
         refgraph = wildcards["refgraph"]
 
         parts = refgraph.split("-")
@@ -860,7 +921,7 @@ def graph_base(wildcards, force_all_refs=False, skip_sampling=False):
             # Which means we need some info about the sample we are working on.
             assert "tech" in wc_keys, "No tech known for haplotype sampling graph " + wildcards["refgraph"]
             assert "sample" in wc_keys, "No sample known for haplotype sampling graph " + wildcards["refgraph"]
-           
+
             # TODO: We always sample for the full real trimmed-if-R10 version
             # of whatever reads we're going to map, so we can consistently use
             # one graph. Note r10y2025 doesn't get trimmed.
@@ -878,28 +939,40 @@ def graph_base(wildcards, force_all_refs=False, skip_sampling=False):
             # We have a clipping modifier, which gets a dot.
             modifications.append("." + last)
             parts.pop()
-        
+
         while len(parts) > 3:
             # We have more than just the 3-tuple of name, version, algorithm. Take the last thing into modifications.
             modifications.append("-" + parts[-1])
             parts.pop()
-        
+
         last = parts[-1]
         if last.endswith(".full"):
             # Move a .full over the reference
             modifications.append(".full")
             last = last[:-5]
             parts[-1] = last
-        
+
 
         # Now we have all the modifications. Flip them around the right way.
         modifications.reverse()
-        
+
         # The first 3 or fewer parts are the graph base name.
         refgraphbase = "-".join(parts)
 
-    result = os.path.join(GRAPHS_DIR, refgraphbase + "-" + reference + "".join(modifications))
+    result = os.path.join(base_dir, refgraphbase + "-" + reference + "".join(modifications))
     return result
+
+def graph_base(wildcards, force_all_refs=False, skip_sampling=False):
+    """
+    Find the base name for a collection of graph files from reference and either refgraph or all of refgraphbase, modifications, and clipping.
+    """
+    return _base_path(GRAPHS_DIR, wildcards, force_all_refs, skip_sampling)
+
+def index_base(wildcards, force_all_refs=False, skip_sampling=False):
+    """
+    Find the base name for a collection of index files from reference and either refgraph or all of refgraphbase, modifications, and clipping.
+    """
+    return _base_path(INDEX_DIR, wildcards, force_all_refs, skip_sampling)
 
 def gbz(wildcards):
     """
@@ -973,7 +1046,7 @@ def dist_indexed_graph(wildcards):
     """
     Find a GBZ and its dist index from reference.
     """
-    base = graph_base(wildcards)
+    base = index_base(wildcards)
     return {
         "gbz": gbz(wildcards),
         "dist": base + ".dist"
@@ -985,7 +1058,7 @@ def indexed_graph(wildcards):
 
     Also checks vgversion to see if we need a no-zipcodes index for old vg.
     """
-    base = graph_base(wildcards)
+    base = index_base(wildcards)
     indexes = dist_indexed_graph(wildcards)
     # Some versions of Giraffe can't use zipcodes. But all the Giraffe versions
     # we test can use the same distance indexes.
@@ -1009,7 +1082,7 @@ def r_and_snarl_indexed_graph(wildcards):
 
     Uses the full distance index if present or the snarls-only one otherwise.
     """
-    base = graph_base(wildcards)
+    base = index_base(wildcards)
     return {
         "gbz": gbz(wildcards),
         "ri": base + ".ri",
@@ -1022,7 +1095,7 @@ def haplotype_indexed_graph(wildcards):
 
     Distance and ri indexes are not needed for haplotype sampling.
     """
-    base = graph_base(wildcards)
+    base = index_base(wildcards)
     return {
         "gbz": gbz(wildcards),
         "hapl": base + ".fragment.hapl"
@@ -1416,6 +1489,12 @@ def all_experiment(wildcard_values, pattern, filter_function=None, empty_ok=Fals
 
     If provided, restricts to conditions passing the filter function.
 
+    If {category} is set, also fills in {dot} with ".".
+
+    The returned values are guaranteed not to contain colons (":"). Colon will
+    be replaced by exclamation point ("!"), and existing exclamation points
+    will be doubled to distinguish them.
+
     Throws an error if nothing is produced and empty_ok is not set.
 
     Needs to be used like:
@@ -1440,7 +1519,10 @@ def all_experiment(wildcard_values, pattern, filter_function=None, empty_ok=Fals
         if debug:
             print(f"Evaluate {pattern} in {merged} from {wildcard_values} and {condition}")
         filename = pattern.format(**merged)
-        yield filename
+        # Encode special characters to avoid colons in filename paths.
+        # Note that anything parsing out a value that might contain ! or : from
+        # a filename will have to reverse the encoding.
+        yield filename.replace("!", "!!").replace(":", "!")
         empty = False
     if empty:
         if debug:
@@ -1656,10 +1738,12 @@ rule gbz_index_primary_graph:
 
 rule distance_index_graph:
     input:
-        gbz="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.gbz"
+        gbz=GRAPHS_DIR + "/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.gbz"
     output:
-        distfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.dist"
-    benchmark: "{graphs_dir}/indexing_benchmarks/distance_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.benchmark"
+        distfile=INDEX_DIR + "/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.dist"
+    benchmark: INDEX_DIR + "/indexing_benchmarks/distance_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.benchmark"
+    params:
+        vg_binary=lambda w: get_vg_version(VG_DISTANCE_INDEXING_VERSION)
     # TODO: Distance indexing only really uses 1 thread
     threads: 1
     resources:
@@ -1667,7 +1751,7 @@ rule distance_index_graph:
         runtime=240,
         slurm_partition=choose_partition(240)
     shell:
-        "vg index -t {threads} -j {output.distfile} {input.gbz}"
+        "{params.vg_binary} index -t {threads} -j {output.distfile} {input.gbz}"
 
 rule precompute_snarls:
     input:
@@ -1684,11 +1768,12 @@ rule precompute_snarls:
 
 rule tcdist_index_graph:
     input:
-        gbz="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.gbz"
+        gbz=GRAPHS_DIR + "/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.gbz"
     output:
-        tcdistfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.tcdist"
-    benchmark: "{graphs_dir}/indexing_benchmarks/tcdistance_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.benchmark"
-
+        tcdistfile=INDEX_DIR + "/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.tcdist"
+    benchmark: INDEX_DIR + "/indexing_benchmarks/tcdistance_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.benchmark"
+    params:
+        vg_binary=lambda w: get_vg_version(VG_DISTANCE_INDEXING_VERSION)
     # TODO: Distance indexing only really uses 1 thread
     threads: 1
     resources:
@@ -1698,14 +1783,14 @@ rule tcdist_index_graph:
         runtime=2880,
         slurm_partition=choose_partition(2880)
     shell:
-        "vg index -t {threads} --no-nested-distance -j {output.tcdistfile} {input.gbz}"
+        "{params.vg_binary} index -t {threads} --no-nested-distance -j {output.tcdistfile} {input.gbz}"
 
 rule r_index_graph:
     input:
         # We don't operate on clipped graphs
-        gbz="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.gbz"
+        gbz=GRAPHS_DIR + "/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.gbz"
     output:
-        rifile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.ri"
+        rifile=INDEX_DIR + "/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.ri"
     threads: 16
     resources:
         mem_mb=lambda w: 120000 if w["full"] == "" else 240000,
@@ -1718,7 +1803,7 @@ rule haplotype_index_graph:
     input:
         unpack(r_and_snarl_indexed_graph),
     output:
-        haplfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.fragment.hapl"
+        haplfile=INDEX_DIR + "/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}.fragment.hapl"
     params:
         vg_binary=get_vg_version(VG_FRAGMENT_HAPLOTYPE_INDEXING_VERSION)
     threads: 16
@@ -1758,7 +1843,8 @@ rule kmer_count_full_sample:
         tmpdir=LARGE_TEMP_DIR
     shell:
         # Need to cut the extension off the output file because KMC will supply it.
-        "kmc -k29 -m128 -okff -t{threads} -hp {input.base_fastq_gz} {params.output_basename} \"$TMPDIR\""
+        # Need to use a unique temp directory
+        "COUNT_DIR=\"$(mktemp -d)\"; kmc -k29 -m128 -okff -t{threads} -hp {input.base_fastq_gz} {params.output_basename} \"$COUNT_DIR\"; rm -Rf \"$COUNT_DIR\""
 
 rule haplotype_sample_graph:
     input:
@@ -1788,22 +1874,23 @@ rule minimizer_index_graph:
     input:
         unpack(dist_indexed_graph)
     output:
-        minfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.withzip.min",
-        zipfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.zipcodes"
-    benchmark: "{graphs_dir}/indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.benchmark"
+        minfile=INDEX_DIR + "/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.withzip.min",
+        zipfile=INDEX_DIR + "/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.zipcodes"
+    benchmark: INDEX_DIR + "/indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.benchmark"
     wildcard_constraints:
         weightedness="\\.W|",
         k="[0-9]+",
         w="[0-9]+"
     params:
         weighting_option=lambda w: "--weighted" if w["weightedness"] == ".W" else "",
+        vg_binary=get_vg_version(VG_MINIMIZER_INDEXING_VERSION)
     threads: 16
     resources:
         mem_mb=lambda w: 600000 if ("hprc-v2" in w["refgraphbase"]  or "hprc-v1.1-nov.11.2024" in w["refgraphbase"]) else 320000 if w["weightedness"] == ".W" else 80000,
         runtime=240,
         slurm_partition=choose_partition(240)
     shell:
-        "vg minimizer --progress -k {wildcards.k} -w {wildcards.w} {params.weighting_option} -t {threads} -p -d {input.dist} -z {output.zipfile} -o {output.minfile} {input.gbz}"
+        "{params.vg_binary} minimizer --progress -k {wildcards.k} -w {wildcards.w} {params.weighting_option} -t {threads} -p -d {input.dist} -z {output.zipfile} -o {output.minfile} {input.gbz}"
 
 rule path_minimizer_index_graph:
     input:
@@ -1831,7 +1918,7 @@ rule non_zipcode_minimizer_index_graph:
         unpack(dist_indexed_graph),
         non_zipcode_vg="vg_v1.62.0"
     output:
-        minfile="{graphs_dir}/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.nozip.min",
+        minfile=INDEX_DIR + "/{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}.k{k}.w{w}{weightedness}.nozip.min",
     wildcard_constraints:
         weightedness="\\.W|",
         k="[0-9]+",
@@ -2217,8 +2304,8 @@ rule giraffe_real_reads:
         exclusive_timing=exclusive_timing 
     resources:
         mem_mb=auto_mapping_memory,
-        runtime=1200,
-        slurm_partition=choose_partition(1200),
+        runtime=auto_mapping_runtime,
+        slurm_partition=auto_mapping_partition,
         slurm_extra=auto_mapping_slurm_extra,
         full_cluster_nodes=auto_mapping_full_cluster_nodes
     run:
@@ -2267,8 +2354,8 @@ rule giraffe_sim_reads:
     threads: auto_mapping_threads
     resources:
         mem_mb=auto_mapping_memory,
-        runtime=600,
-        slurm_partition=choose_partition(600)
+        runtime=auto_mapping_runtime,
+        slurm_partition=auto_mapping_partition
     run:
         vg_binary = get_vg_version(wildcards.vgversion)
         flags=get_vg_flags(wildcards.vgflag)
@@ -2289,8 +2376,8 @@ rule giraffe_sim_reads_with_correctness:
     threads: auto_mapping_threads
     resources:
         mem_mb=auto_mapping_memory,
-        runtime=600,
-        slurm_partition=choose_partition(600)
+        runtime=auto_mapping_runtime,
+        slurm_partition=auto_mapping_partition
     run:
         vg_binary = get_vg_version(wildcards.vgversion)
         flags=get_vg_flags(wildcards.vgflag)
@@ -2364,15 +2451,17 @@ rule winnowmap_real_reads:
 rule minimap2_index_reference:
     input:
         reference_fasta=REFS_DIR + "/{basename}.fa"
+    params:
+        mode=minimap_derivative_mode
     output:
-        index=REFS_DIR + "/{basename}.{mmpreset}.mmi"
+        index=REFS_DIR + "/{basename}.{minimapmode}.mmi"
     threads: 16
     resources:
         mem_mb=16000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
-         "minimap2 -t {threads} -x {wildcards.mmpreset} -d {output.index} {input.reference_fasta}"
+         "minimap2 -t {threads} -x {params.mode} -d {output.index} {input.reference_fasta}"
 
 
 # Note: This changes the simulated read names so that it will be run paired ended.
@@ -2380,6 +2469,8 @@ rule minimap2_sim_reads:
     input:
         minimap2_index=minimap2_index,
         fastq_gz=fastq_gz
+    params:
+        mode=minimap_derivative_mode
     output:
         sam=temp("{root}/aligned-secsup/{reference}/minimap2-{minimapmode}/{realness}/{tech}/{sample}{trimmedness}.{subset}.sam")
     params:
@@ -2395,7 +2486,7 @@ rule minimap2_sim_reads:
     shell:
         """
         zcat {input.fastq_gz} | awk '{{gsub("_1$", ""); gsub("_2$", ""); print $0}}' | gzip > {params.temp_fastq} 
-        minimap2 -t {threads} -ax {wildcards.minimapmode} --secondary=no {input.minimap2_index} {params.temp_fastq} 2> {log} > {output.sam}
+        minimap2 -t {threads} -ax {params.mode} --secondary=no {input.minimap2_index} {params.temp_fastq} 2> {log} > {output.sam}
         rm {params.temp_fastq}
         """
 
@@ -2403,6 +2494,8 @@ rule minimap2_real_reads:
     input:
         minimap2_index=minimap2_index,
         fastq_gz=fastq_gz
+    params:
+        mode=minimap_derivative_mode
     output:
         sam=temp("{root}/aligned-secsup/{reference}/minimap2-{minimapmode}/{realness}/{tech}/{sample}{trimmedness}.{subset}.sam")
     benchmark: "{root}/aligned-secsup/{reference}/minimap2-{minimapmode}/{realness}/{tech}/{sample}{trimmedness}.{subset}.benchmark"
@@ -2419,7 +2512,7 @@ rule minimap2_real_reads:
         slurm_extra=auto_mapping_slurm_extra,
         full_cluster_nodes=auto_mapping_full_cluster_nodes
     shell:
-        "minimap2 -t {threads} -ax {wildcards.minimapmode} --secondary=no {input.minimap2_index} {input.fastq_gz} >{output.sam} 2> {log}"
+        "minimap2 -t {threads} -ax {params.mode} --secondary=no {input.minimap2_index} {input.fastq_gz} >{output.sam} 2> {log}"
 
 # pbmm2 uses the same indexes as minimap2
 # TODO: pbmm2 makes BAM output but we're calling it SAM here.
@@ -2804,7 +2897,7 @@ rule surject_gam:
         vg_binary=get_vg_version(VG_SURJECT_VERSION)
     threads: 40
     resources:
-        mem_mb=lambda w: (600000 / 64 * 40) if w["tech"] in ("r10", "r10y2025") else (150000 / 64 * 40),
+        mem_mb=lambda w: (500000 / 64 * 40) if w["tech"] in ("r10", "r10y2025") else (300000 / 64 * 40),
         runtime=600,
         slurm_partition=choose_partition(600)
     shell:
@@ -2958,6 +3051,7 @@ rule call_variants_dv:
             "DeepVariant.OUTPUT_CALLING_BAMS": False,
             "DeepVariant.CALL_CORES": 8 * 4,
             "DeepVariant.CALL_MEM": 50 * 4,
+            "DeepVariant.EVAL_MEM": 120,
             "DeepVariant.MAKE_EXAMPLES_MEM": 100 if wildcards.reference == "grch38" else 50
         }
         if dv_docker == "gcr.io/deepvariant-docker/deepvariant:head756846963":
@@ -3081,6 +3175,52 @@ rule dv_summary_table:
         printf "condition\tTP\tFN\tFP\trecall\tprecision\tF1\n" >> {output.tsv}
         cat {input} >>{output.tsv}
         """
+
+rule dv_total_summary_table:
+    input:
+        snp_tsv="{root}/experiments/{expname}/results/dv_snp_summary.tsv",
+        indel_tsv="{root}/experiments/{expname}/results/dv_indel_summary.tsv"
+    output:
+        tsv="{root}/experiments/{expname}/results/dv_total_summary.tsv"
+    threads: 1
+    resources:
+        mem_mb=200,
+        runtime=10,
+        slurm_partition=choose_partition(10)
+    run:
+        # To combine the summaries, we need to sum these columns by
+        # "condition", and then recompute "recall", "precision", and "F1"
+        SUM_COLS = ("TP", "FN", "FP")
+        combined = {}
+        for in_file in (input.snp_tsv, input.indel_tsv):
+            headers = []
+            for line in open(in_file):
+                parts = line.rstrip().split("\t")
+                if not headers:
+                    headers = parts
+                else:
+                    row = dict(zip(headers, parts))
+                    condition = row["condition"]
+                    to_add = {k: int(row[k]) for k in SUM_COLS}
+                    if condition not in combined:
+                        combined[condition] = to_add
+                    else:
+                        for k in SUM_COLS:
+                            combined[condition][k] += to_add[k]
+        with open(output.tsv, "w") as f:
+            f.write("condition\t")
+            for stat in SUM_COLS:
+                f.write(f"{stat}\t")
+            f.write("recall\tprecision\tF1\n")
+            for condition, stats in combined.items():
+                f.write(f"{condition}\t")
+                for stat in SUM_COLS:
+                    f.write(f"{stats[stat]}\t")
+                recall = stats["TP"] / (stats["TP"] + stats["FN"])
+                precision = stats["TP"] / (stats["TP"] + stats["FP"])
+                f1 = 2 / (1 / precision + 1 / recall)
+                f.write(f"{recall}\t{precision}\t{f1}\n")
+
 
 
 
@@ -3678,9 +3818,9 @@ rule haplotype_sampling_time_empty:
 rule haplotype_sampling_time_giraffe:
     input:
         kmer_counting=kmer_counts_benchmark,
-        haplotype_sampling=os.path.join(GRAPHS_DIR, "indexing_benchmarks/haplotype_sampling_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}_fragmentlinked-for-{realness}-{tech}-{sample}{trimmedness}-{subset}.benchmark"),
-        distance_indexing=os.path.join(GRAPHS_DIR, "indexing_benchmarks/distance_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}_fragmentlinked-for-{realness}-{tech}-{sample}{trimmedness}-{subset}.benchmark"),
-        minimizer_indexing=os.path.join(GRAPHS_DIR, "indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}_fragmentlinked-for-{realness}-{tech}-{sample}{trimmedness}-{subset}.k{k}.w{w}{weightedness}{pathness}.benchmark")
+        haplotype_sampling=os.path.join(INDEX_DIR, "indexing_benchmarks/haplotype_sampling_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}_fragmentlinked-for-{realness}-{tech}-{sample}{trimmedness}-{subset}.benchmark"),
+        distance_indexing=os.path.join(INDEX_DIR, "indexing_benchmarks/distance_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}_fragmentlinked-for-{realness}-{tech}-{sample}{trimmedness}-{subset}.benchmark"),
+        minimizer_indexing=os.path.join(INDEX_DIR, "indexing_benchmarks/minimizer_indexing_{refgraphbase}-{reference}{modifications}{clipping}{full}{chopping}{sampling}_fragmentlinked-for-{realness}-{tech}-{sample}{trimmedness}-{subset}.k{k}.w{w}{weightedness}{pathness}.benchmark")
     params:
         condition_name=condition_name
     output:
@@ -5275,6 +5415,46 @@ rule softclips:
     shell:
         r"cut -f2,3 {input} | tr '\t' '\n' > {output}"
 
+
+rule score_gam:
+    input:
+        gam="{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
+    output:
+        tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.score.tsv"
+    threads: 16
+    resources:
+        mem_mb=20000,
+        runtime=60,
+        slurm_partition=choose_partition(60)
+    shell:
+        "vg filter -t {threads} -T 'score' {input.gam} | grep -v '#' > {output.tsv}"
+
+rule mapped_score_gam:
+    input:
+        gam="{root}/aligned/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gam"
+    output:
+        tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.mapped_score.tsv"
+    threads: 16
+    resources:
+        mem_mb=20000,
+        runtime=60,
+        slurm_partition=choose_partition(60)
+    shell:
+        "vg filter -t {threads} --min-primary 1 -T 'score' {input.gam} | grep -v '#' > {output.tsv}"
+
+rule match_bp_from_stats:
+    input:
+        stats="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.gamstats.txt"
+    output:
+        tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.match_bp.tsv"
+    threads: 1
+    resources:
+        mem_mb=4000,
+        runtime=10,
+        slurm_partition=choose_partition(10)
+    shell:
+        "cat {input.stats} | grep '^Matches:' | cut -f2 -d' ' > {output.tsv}"
+
 rule hardclips:
     input:
         "{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.hardclips_by_name.tsv"
@@ -5725,7 +5905,7 @@ rule average_stage_time_barchart:
         mapper_stages=mapper_stages
     threads: 1
     resources:
-        mem_mb=1024,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5738,7 +5918,7 @@ rule average_aligner_time_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/average_aligner_time-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5751,7 +5931,7 @@ rule total_aligner_time_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/total_aligner_time-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5765,7 +5945,7 @@ rule average_aligner_bases_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/average_aligner_bases-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5778,7 +5958,7 @@ rule average_aligner_invocations_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/average_aligner_invocations-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5791,7 +5971,7 @@ rule average_aligner_fraction_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/average_aligner_fraction-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
@@ -5817,7 +5997,7 @@ rule average_aligner_probsize_barchart:
         "{root}/plots/{reference}/{refgraph}/{mapper}/average_aligner_probsize-{realness}-{tech}-{sample}{trimmedness}.{subset}.{ext}"
     threads: 1
     resources:
-        mem_mb=512,
+        mem_mb=2000,
         runtime=10,
         slurm_partition=choose_partition(10)
     shell:
