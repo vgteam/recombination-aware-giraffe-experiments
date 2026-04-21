@@ -101,7 +101,7 @@ experiments:
       realness: sim
     vary:
       refgraph: ["hprc-v2.1-mc-eval-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-hifi-a2eb9e-noflags", "giraffe-k31.w50.W-hifi-90fd84-noflags"]
+      mapper: ["giraffe-k31.w50.W-hifi-a2eb9e-noflags", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc10", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc20", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc30", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc40", "giraffe-k31.w50.W-hifi-90fd84-noflags", "giraffe-k31.w50.W.path-hifi-90fd84-rpc10", "giraffe-k31.w50.W.path-hifi-90fd84-rpc20", "giraffe-k31.w50.W.path-hifi-90fd84-rpc30", "giraffe-k31.w50.W.path-hifi-90fd84-rpc40"]
 
   hifi_sim_100k:
     control:
@@ -112,7 +112,7 @@ experiments:
       realness: sim
     vary:
       refgraph: ["hprc-v2.1-mc-eval-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-hifi-a2eb9e-noflags", "giraffe-k31.w50.W-hifi-90fd84-noflags"]
+      mapper: ["giraffe-k31.w50.W-hifi-a2eb9e-noflags", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc10", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc20", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc30", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc40", "giraffe-k31.w50.W-hifi-90fd84-noflags", "giraffe-k31.w50.W.path-hifi-90fd84-rpc10", "giraffe-k31.w50.W.path-hifi-90fd84-rpc20", "giraffe-k31.w50.W.path-hifi-90fd84-rpc30", "giraffe-k31.w50.W.path-hifi-90fd84-rpc40"]
 
   hifi_real_100k:
     control:
@@ -123,7 +123,7 @@ experiments:
       realness: real
     vary:
       refgraph: ["hprc-v2.1-mc-eval-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-hifi-a2eb9e-noflags", "giraffe-k31.w50.W-hifi-90fd84-noflags"]
+      mapper: ["giraffe-k31.w50.W-hifi-a2eb9e-noflags", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc10", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc20", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc30", "giraffe-k31.w50.W.path-hifi-a2eb9e-rpc40", "giraffe-k31.w50.W-hifi-90fd84-noflags", "giraffe-k31.w50.W.path-hifi-90fd84-rpc10", "giraffe-k31.w50.W.path-hifi-90fd84-rpc20", "giraffe-k31.w50.W.path-hifi-90fd84-rpc30", "giraffe-k31.w50.W.path-hifi-90fd84-rpc40"]
 
   hifi_real_full_call_chm13:
     control:
@@ -139,7 +139,7 @@ experiments:
       truthset: giab6
       truthref: chm13
     vary:
-      mapper: ["giraffe-k31.w50.W-hifi-a2eb9e-noflags", "giraffe-k31.w50.W-hifi-90fd84-noflags"]
+      mapper: ["giraffe-k31.w50.W.path-hifi-a2eb9e-rpc10", "giraffe-k31.w50.W.path-hifi-90fd84-rpc0", "giraffe-k31.w50.W.path-hifi-90fd84-rpc3", "giraffe-k31.w50.W.path-hifi-90fd84-rpc10"]
 
   hifi_sim_1m:
     control:
