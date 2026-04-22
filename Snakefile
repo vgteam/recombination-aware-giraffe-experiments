@@ -339,9 +339,10 @@ def auto_mapping_full_cluster_nodes(wildcards):
 
 def auto_mapping_memory(wildcards):
     """
-    Determine the memory to use for Giraffe mapping, in MB, from subset, realness, and tech.
+    Determine the memory to use for Giraffe mapping, in MB, from subset, realness, subset, and tech.
     """
     thread_count = auto_mapping_threads(wildcards)
+    read_count = subset_to_number(wildcards["subset"])
 
     base_mb = 60000
 
@@ -352,7 +353,10 @@ def auto_mapping_memory(wildcards):
     elif wildcards["tech"] == "r10":
         scale_mb = 600000
     elif wildcards["tech"] == "r10y2025":
-        scale_mb = 400000
+        if read_count > 100000:
+            scale_mb = 400000
+        else:
+            scale_mb = 200000
     else:
         scale_mb = 210000
 
