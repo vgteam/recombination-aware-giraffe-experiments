@@ -4099,7 +4099,7 @@ rule experiment_qq_plot_from_compared:
     input:
         tsv="{root}/experiments/{expname}/results/compared.tsv"
     output:
-        "{root}/experiments/{expname}/plots/qq.{ext}"
+        "{root}/experiments/{expname}/plots/qq.pdf"
     threads: 1
     resources:
         mem_mb=10000,
@@ -4125,7 +4125,7 @@ rule experiment_roc_plot_from_compared:
     input:
         tsv="{root}/experiments/{expname}/results/compared.tsv"
     output:
-        "{root}/experiments/{expname}/plots/roc.{ext}"
+        "{root}/experiments/{expname}/plots/roc.pdf"
     threads: 1
     resources:
         mem_mb=10000,
