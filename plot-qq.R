@@ -88,7 +88,7 @@ if (title != '') {
 }
 
 filename <- commandArgs(TRUE)[2]
-pdf(filename, 4.5, 4)
-dat.plot + guides(color="none", size="none")
+pdf(filename, 8, 4)
+#dat.plot + guides(color="none", size="none")
 dat.plot
 dev.off()
