@@ -1,5 +1,7 @@
 #name	type	min_val	max_val	default	sampling_strategy
 rec-mode	flag	true	true	true	uniform
-rec-penalty	int	1	6	0	uniform
-rec-penalty-aln	int	25	35	0	uniform
-rec-consistency-bonus	int	5	15	0	uniform
+rec-penalty	int	0	10	0	uniform
+rec-penalty-aln	int	25	40	0	uniform
+rec-consistency-bonus	int	5	20	0	uniform
+min-chain-score-per-base	float	0.001	0.005	0.052	uniform
+max-min-chain-score	int	1900	1900	1900	uniform

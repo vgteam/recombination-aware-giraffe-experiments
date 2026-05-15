@@ -161,7 +161,7 @@ experiments:
       realness: sim
     vary:
       refgraph: ["hprc-v2.1-mc-eval-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-r10-v1.73.0-noflags", "giraffe-k31.w50.W-r10-a2eb9e-noflags", "giraffe-k31.w50.W.path-r10-a2eb9e-rpc10", "giraffe-k31.w50.W-r10-90fd84-noflags", "giraffe-k31.w50.W.path-r10-90fd84-rpc0", "giraffe-k31.w50.W.path-r10-90fd84-rpc3", "giraffe-k31.w50.W.path-r10-90fd84-rpc10", "giraffe-k31.w50.W.path-r10-90fd84-rpc20"]
+      mapper: ["giraffe-k31.w50.W-r10-default-noflags", "giraffe-k31.w50.W.path-r10-default-recprop2", "giraffe-k31.w50.W-r10-default-norecprop2", "giraffe-k31.w50.W.path-r10-default-recprop1again"]
 
   r10y2025_sim_1m:
     control:
@@ -183,7 +183,7 @@ experiments:
       realness: real
     vary:
       refgraph: ["hprc-v2.1-mc-eval-sampled16o"]
-      mapper: ["giraffe-k31.w50.W-r10-v1.73.0-noflags", "giraffe-k31.w50.W-r10-a2eb9e-noflags", "giraffe-k31.w50.W.path-r10-a2eb9e-rpc10", "giraffe-k31.w50.W-r10-90fd84-noflags", "giraffe-k31.w50.W.path-r10-90fd84-rpc0", "giraffe-k31.w50.W.path-r10-90fd84-rpc3", "giraffe-k31.w50.W.path-r10-90fd84-rpc10", "giraffe-k31.w50.W.path-r10-90fd84-rpc20"]
+      mapper: ["giraffe-k31.w50.W-r10-default-noflags", "giraffe-k31.w50.W.path-r10-default-recprop2", "giraffe-k31.w50.W-r10-default-norecprop2", "giraffe-k31.w50.W.path-r10-default-recprop1again"]
 
   r10y2025_real_full_call_chm13:
     control:

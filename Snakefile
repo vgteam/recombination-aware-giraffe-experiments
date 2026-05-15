@@ -216,6 +216,9 @@ LARGE_TEMP_DIR = config.get("large_temp_dir", "/data/tmp")
 #This gets added as a slurm_extra for all the real read runs
 REAL_SLURM_EXTRA = config.get("real_slurm_extra", None) or ""
 
+# We can ovverride the partition and send everyone to the same one
+SLURM_PARTITION_OVERRIDE = config.get("slurm_partition_override", None)
+
 # If set to True, jobs where we care about speed will demand entire nodes.
 # If False, they will just use one thread per core.
 EXCLUSIVE_TIMING = config.get("exclusive_timing", True)
@@ -391,6 +394,8 @@ def choose_partition(minutes):
     Get a Slurm partition that can fit a job running for the given number of
     minutes, or raise an error.
     """
+    if SLURM_PARTITION_OVERRIDE is not None:
+        return SLURM_PARTITION_OVERRIDE
     for name, limit in SLURM_PARTITIONS:
         if minutes <= limit:
             return name
@@ -1577,6 +1582,14 @@ def get_vg_flags(wildcard_flag):
         case s if s.startswith("rpc"):
             match = re.fullmatch("rpc([0-9]+)", s)
             return f"--rec-mode --rec-penalty-chain {match.group(1)}"
+        case "recprop1":
+            return "--rec-mode --rec-penalty 2 --rec-penalty-aln 32 --rec-consistency-bonus 13"
+        case "recprop1again":
+            return "--rec-mode --rec-penalty 2 --rec-penalty-aln 32 --rec-consistency-bonus 13 --min-chain-score-per-base 0.0010573511598202133"
+        case "recprop2":
+            return "--rec-mode --rec-penalty 2 --rec-penalty-aln 36 --rec-consistency-bonus 18 --min-chain-score-per-base 0.0010573511598202133"
+        case "norecprop2":
+            return "--min-chain-score-per-base 0.0010573511598202133"
         case "noflags":
             return ""
         case unknown:
