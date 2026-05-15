@@ -1582,14 +1582,10 @@ def get_vg_flags(wildcard_flag):
         case s if s.startswith("rpc"):
             match = re.fullmatch("rpc([0-9]+)", s)
             return f"--rec-mode --rec-penalty-chain {match.group(1)}"
-        case "recprop1":
-            return "--rec-mode --rec-penalty 2 --rec-penalty-aln 32 --rec-consistency-bonus 13"
-        case "recprop1again":
+        case "recpropr10":
             return "--rec-mode --rec-penalty 2 --rec-penalty-aln 32 --rec-consistency-bonus 13 --min-chain-score-per-base 0.0010573511598202133"
-        case "recprop2":
-            return "--rec-mode --rec-penalty 2 --rec-penalty-aln 36 --rec-consistency-bonus 18 --min-chain-score-per-base 0.0010573511598202133"
-        case "norecprop2":
-            return "--min-chain-score-per-base 0.0010573511598202133"
+        case "recprophifi":
+            return "--rec-mode --rec-penalty 2 --rec-penalty-aln 28 --rec-consistency-bonus 12"
         case "noflags":
             return ""
         case unknown:
