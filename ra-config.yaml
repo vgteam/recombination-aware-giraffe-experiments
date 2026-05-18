@@ -199,7 +199,7 @@ experiments:
       truthset: giab6
       truthref: chm13
     vary:
-      mapper: ["giraffe-k31.w50.W.path-r10-default-recpropr10", "giraffe-k31.w50.W-r10-default-noflags"]
+      mapper: ["giraffe-k31.w50.W.path-r10-default-recpropr10", "giraffe-k31.w50.W.path-r10-default-mcspbr10", "giraffe-k31.w50.W.path-r10-default-recproponlyr10", "giraffe-k31.w50.W-r10-default-noflags"]
 
   illuminachaining_real_full_call_chm13:
     control:
