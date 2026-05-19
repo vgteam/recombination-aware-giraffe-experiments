@@ -139,7 +139,7 @@ experiments:
       truthset: giab6
       truthref: chm13
     vary:
-      mapper: ["giraffe-k31.w50.W.path-hifi-default-recprophifi", "giraffe-k31.w50.W-hifi-default-noflags"]
+      mapper: ["giraffe-k31.w50.W.path-hifi-default-recprophifi", "giraffe-k31.w50.W.path-hifi-93df42-recprophifi"]
 
   hifi_sim_1m:
     control:
@@ -199,7 +199,7 @@ experiments:
       truthset: giab6
       truthref: chm13
     vary:
-      mapper: ["giraffe-k31.w50.W.path-r10-default-recpropr10", "giraffe-k31.w50.W.path-r10-default-mcspbr10", "giraffe-k31.w50.W.path-r10-default-recproponlyr10", "giraffe-k31.w50.W-r10-default-noflags"]
+      mapper: ["giraffe-k31.w50.W.path-r10-default-recproponlyr10", "giraffe-k31.w50.W.path-r10-93df42-recproponlyr10"]
 
   illuminachaining_real_full_call_chm13:
     control:
