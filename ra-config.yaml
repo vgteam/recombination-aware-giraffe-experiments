@@ -154,7 +154,7 @@ experiments:
 
   hifi_sim_10k:
     control:
-      subset: 1m
+      subset: 10k
       tech: hifi
       reference: chm13
       sample: HG002
