@@ -150,7 +150,7 @@ experiments:
       realness: sim
     vary:
       refgraph: ["hprc-v2.1-mc-eval-sampled16o"]
-      mapper: ["giraffe-k31.w50.W.path-hifi-a2eb9e-rpc10", "giraffe-k31.w50.W.path-hifi-90fd84-rpc10", "giraffe-k31.w50.W-hifi-a2eb9e-noflags", "giraffe-k31.w50.W-hifi-90fd84-noflags"]
+      mapper: ["giraffe-k31.w50.W.path-hifi-default-noflags", "giraffe-k31.w50.W.path-hifi-default-norec"]
 
   hifi_sim_10k:
     control:

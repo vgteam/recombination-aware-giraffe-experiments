@@ -3447,7 +3447,7 @@ rule correct_names_from_compared_table:
         runtime=60,
         slurm_partition=choose_partition(60)
     shell:
-        "( grep '^1' {input.all_comparison} || test $? = 1; ) | cut -f4 >{output.tsv}"
+        "( grep '^1' {input.all_comparison} || test $? = 1; ) | cut -f4 | sort >{output.tsv}"
 
 rule eligible_names_from_compared_table:
     input:
@@ -3460,7 +3460,7 @@ rule eligible_names_from_compared_table:
         runtime=60,
         slurm_partition=choose_partition(60)
     shell:
-        "( grep '1$' {input.all_comparison} || test $? = 1; ) | cut -f4 >{output.tsv}"
+        "( grep '1$' {input.all_comparison} || test $? = 1; ) | cut -f4 | sort >{output.tsv}"
 
 rule correct_bases:
     input:
@@ -3476,7 +3476,7 @@ rule correct_bases:
         runtime=20,
         slurm_partition=choose_partition(20)
     shell:
-        "join <(join {input.correct_names} {input.read_length_by_name}) {input.softclips_by_name} | awk '{{print $2 - $3 - $4}}'"
+        "join <(join {input.correct_names} {input.read_length_by_name}) {input.softclips_by_name} | awk '{{print $2 - $3 - $4}}' >{output.tsv}"
 
 rule eligible_bases:
     input:
@@ -3490,7 +3490,7 @@ rule eligible_bases:
         runtime=20,
         slurm_partition=choose_partition(20)
     shell:
-        "join {input.eligible_names} {input.read_length_by_name} | awk '{{print $2}}'"
+        "join {input.eligible_names} {input.read_length_by_name} | awk '{{print $2}}' >{output.tsv}"
 
 # Bases that aren't correctly mapped (might be clipped or mismapped) but are eligible
 rule wrong_bp_from_correct_bases_and_total_bases:
@@ -3505,7 +3505,8 @@ rule wrong_bp_from_correct_bases_and_total_bases:
         runtime=10,
         slurm_partition=choose_partition(10)
     run:
-        wrong_bp = int(open(input.eligible_bases_total).read()) - int(open(input.correct_bases_total).read())
+        # Some of the sums might think they are floats.
+        wrong_bp = int(open(input.eligible_bases_total).read().replace(".0\n", "")) - int(open(input.correct_bases_total).read().replace(".0\n", ""))
         with open(output.tsv, "w") as out_stream:
             out_stream.write(f"{wrong_bp}\n")
 
