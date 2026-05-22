@@ -1557,7 +1557,7 @@ def has_stat_filter(stat_name):
         Return True if the given condition dict should have the stat named stat_name.
         """
 
-        if stat_name in {"correct", "accuracy", "wrong"}:
+        if stat_name in {"correct", "accuracy", "wrong", "wrong_bp"}:
             # These stats only exist for conditions with a truth set (i.e. simulated ones)
             if condition["realness"] != "sim":
                 return False
@@ -1582,14 +1582,11 @@ def get_vg_flags(wildcard_flag):
         case s if s.startswith("rpc"):
             match = re.fullmatch("rpc([0-9]+)", s)
             return f"--rec-mode --rec-penalty-chain {match.group(1)}"
-        case "recpropr10":
-            return "--rec-mode --rec-penalty 2 --rec-penalty-aln 32 --rec-consistency-bonus 13 --min-chain-score-per-base 0.0010573511598202133"
-        case "mcspbr10":
-            return "--min-chain-score-per-base 0.0010573511598202133"
-        case "recproponlyr10":
-            return "--rec-mode --rec-penalty 2 --rec-penalty-aln 32 --rec-consistency-bonus 13"
-        case "recprophifi":
-            return "--rec-mode --rec-penalty 2 --rec-penalty-aln 28 --rec-consistency-bonus 12"
+        case s if s.startswith("mcspb"):
+            match = re.fullmatch("mcspb([0-9\\.]+)", s)
+            return f"--min-chain-score-per-base {match.group(1)}"
+        case "norec":
+            return "--no-rec-mode"
         case "noflags":
             return ""
         case unknown:
@@ -3439,6 +3436,80 @@ rule mismapped_names_from_compared_table:
     shell:
         "join -1 1 -2 4 {input.mapped_names} <( ( grep '^0.*1$' {input.all_comparison} || test $? = 1; ) | sort -k4b,4) | cut -f1 -d' ' >{output.tsv}"
 
+rule correct_names_from_compared_table:
+    input:
+        all_comparison="{root}/compared/{reference}/{refgraph}/{mapper}/sim/{tech}/{sample}{trimmedness}.{subset}.compared.tsv",
+    output:
+        tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.correct_names.tsv"
+    threads: 2
+    resources:
+        mem_mb=10000,
+        runtime=60,
+        slurm_partition=choose_partition(60)
+    shell:
+        "( grep '^1' {input.all_comparison} || test $? = 1; ) | cut -f4 >{output.tsv}"
+
+rule eligible_names_from_compared_table:
+    input:
+        all_comparison="{root}/compared/{reference}/{refgraph}/{mapper}/sim/{tech}/{sample}{trimmedness}.{subset}.compared.tsv",
+    output:
+        tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.eligible_names.tsv"
+    threads: 2
+    resources:
+        mem_mb=10000,
+        runtime=60,
+        slurm_partition=choose_partition(60)
+    shell:
+        "( grep '1$' {input.all_comparison} || test $? = 1; ) | cut -f4 >{output.tsv}"
+
+rule correct_bases:
+    input:
+        # This has both ends
+        softclips_by_name="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.softclips_by_name.tsv",
+        read_length_by_name=os.path.join(READS_DIR, "{realness}/{tech}/stats/{sample}{trimmedness}.{subset}.read_length_by_name.tsv"),
+        correct_names="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.correct_names.tsv"
+    output:
+        tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.correct_bases.tsv"
+    threads: 2
+    resources:
+        mem_mb=4000,
+        runtime=20,
+        slurm_partition=choose_partition(20)
+    shell:
+        "join <(join {input.correct_names} {input.read_length_by_name}) {input.softclips_by_name} | awk '{{print $2 - $3 - $4}}'"
+
+rule eligible_bases:
+    input:
+        read_length_by_name=os.path.join(READS_DIR, "{realness}/{tech}/stats/{sample}{trimmedness}.{subset}.read_length_by_name.tsv"),
+        eligible_names="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.eligible_names.tsv"
+    output:
+        tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.eligible_bases.tsv"
+    threads: 2
+    resources:
+        mem_mb=4000,
+        runtime=20,
+        slurm_partition=choose_partition(20)
+    shell:
+        "join {input.eligible_names} {input.read_length_by_name} | awk '{{print $2}}'"
+
+# Bases that aren't correctly mapped (might be clipped or mismapped) but are eligible
+rule wrong_bp_from_correct_bases_and_total_bases:
+    input:
+        eligible_bases_total="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.eligible_bases.total.tsv",
+        correct_bases_total="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.correct_bases.total.tsv"
+    output:
+        tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.wrong_bp.tsv"
+    threads: 1
+    resources:
+        mem_mb=4000,
+        runtime=10,
+        slurm_partition=choose_partition(10)
+    run:
+        wrong_bp = int(open(input.eligible_bases_total).read()) - int(open(input.correct_bases_total).read())
+        with open(output.tsv, "w") as out_stream:
+            out_stream.write(f"{wrong_bp}\n")
+
+
 rule mismapped_from_names:
     input:
         tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.mismapped_names.tsv"
@@ -3893,7 +3964,7 @@ rule condition_experiment_stat:
         tsv="{root}/experiments/{expname}/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}{callparams}{dot}{category}.{conditionstat}.tsv"
     wildcard_constraints:
         refgraph="[^/_]+",
-        conditionstat="((overall_fraction_)?(wrong|correct|eligible|(positive_)?(unmapped|mismapped))|accuracy|(snp|indel)_(f1|precision|recall|fn|fp)|(snp|indel|total)_errors|[a-zA-Z0-9_]*.total)"
+        conditionstat="((overall_fraction_)?(wrong|correct|eligible|(positive_)?(unmapped|mismapped))|accuracy|(snp|indel)_(f1|precision|recall|fn|fp)|(snp|indel|total)_errors|[a-zA-Z0-9_]*.total|wrong_bp)"
     threads: 1
     resources:
         mem_mb=1000,
@@ -4022,6 +4093,19 @@ rule experiment_positive_unmapped_plot:
         slurm_partition=choose_partition(5)
     shell:
         "python3 barchart.py {input.tsv} --width 8 --height 8 --title '{wildcards.expname} Positive-Truth Unmapped' --y_label 'Unmapped Reads' --x_label 'Condition' --x_sideways --no_n --save {output}"
+
+rule experiment_wrong_bp_plot:
+    input:
+        tsv="{root}/experiments/{expname}/results/wrong_bp.tsv"
+    output:
+        "{root}/experiments/{expname}/plots/wrong_bp.{ext}"
+    threads: 1
+    resources:
+        mem_mb=1000,
+        runtime=5,
+        slurm_partition=choose_partition(5)
+    shell:
+        "python3 barchart.py {input.tsv} --width 8 --height 8 --title '{wildcards.expname} Wrong Bases' --y_label 'Wrong Bases (bp)' --x_label 'Condition' --x_sideways --no_n --save {output}"
 
 rule experiment_accuracy_plot:
     input:
