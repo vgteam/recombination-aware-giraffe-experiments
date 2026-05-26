@@ -1557,7 +1557,7 @@ def has_stat_filter(stat_name):
         Return True if the given condition dict should have the stat named stat_name.
         """
 
-        if stat_name in {"correct", "accuracy", "wrong", "wrong_bp"}:
+        if stat_name in {"correct", "accuracy", "wrong", "wrong_bp", "mismapped_bp"}:
             # These stats only exist for conditions with a truth set (i.e. simulated ones)
             if condition["realness"] != "sim":
                 return False
@@ -3492,6 +3492,24 @@ rule eligible_bases:
     shell:
         "join {input.eligible_names} {input.read_length_by_name} | awk '{{print $2}}' >{output.tsv}"
 
+# Mismapped bases are mapped to the wrong place but not clipped there
+rule mismapped_bases:
+    input:
+        # This has both ends
+        softclips_by_name="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.softclips_by_name.tsv",
+        read_length_by_name=os.path.join(READS_DIR, "{realness}/{tech}/stats/{sample}{trimmedness}.{subset}.read_length_by_name.tsv"),
+        mismapped_names="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.mismapped_names.tsv"
+    output:
+        tsv="{root}/stats/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}.mismapped_bases.tsv"
+    threads: 2
+    resources:
+        mem_mb=4000,
+        runtime=20,
+        slurm_partition=choose_partition(20)
+    shell:
+        "join <(join {input.mismapped_names} {input.read_length_by_name}) {input.softclips_by_name} | awk '{{print $2 - $3 - $4}}' >{output.tsv}"
+
+
 # Bases that aren't correctly mapped (might be clipped or mismapped) but are eligible
 rule wrong_bp_from_correct_bases_and_total_bases:
     input:
@@ -3965,7 +3983,7 @@ rule condition_experiment_stat:
         tsv="{root}/experiments/{expname}/{reference}/{refgraph}/{mapper}/{realness}/{tech}/{sample}{trimmedness}.{subset}{callparams}{dot}{category}.{conditionstat}.tsv"
     wildcard_constraints:
         refgraph="[^/_]+",
-        conditionstat="((overall_fraction_)?(wrong|correct|eligible|(positive_)?(unmapped|mismapped))|accuracy|(snp|indel)_(f1|precision|recall|fn|fp)|(snp|indel|total)_errors|[a-zA-Z0-9_]*.total|wrong_bp)"
+        conditionstat="((overall_fraction_)?(wrong|correct|eligible|(positive_)?(unmapped|mismapped))|accuracy|(snp|indel)_(f1|precision|recall|fn|fp)|(snp|indel|total)_errors|[a-zA-Z0-9_]*.total|(wrong|mismapped)_bp)"
     threads: 1
     resources:
         mem_mb=1000,
@@ -4107,6 +4125,19 @@ rule experiment_wrong_bp_plot:
         slurm_partition=choose_partition(5)
     shell:
         "python3 barchart.py {input.tsv} --width 8 --height 8 --title '{wildcards.expname} Wrong Bases' --y_label 'Wrong Bases (bp)' --x_label 'Condition' --x_sideways --no_n --save {output}"
+
+rule experiment_mismapped_bp_plot:
+    input:
+        tsv="{root}/experiments/{expname}/results/mismapped_bases.total.tsv"
+    output:
+        "{root}/experiments/{expname}/plots/mismapped_bp.{ext}"
+    threads: 1
+    resources:
+        mem_mb=1000,
+        runtime=5,
+        slurm_partition=choose_partition(5)
+    shell:
+        "python3 barchart.py {input.tsv} --width 8 --height 8 --title '{wildcards.expname} Mismapped Bases' --y_label 'Mismapped Unclipped Bases (bp)' --x_label 'Condition' --x_sideways --no_n --save {output}"
 
 rule experiment_accuracy_plot:
     input:
